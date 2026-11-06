@@ -1,9 +1,13 @@
 package com.nan.daymarkbackend;
 
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
 
 @SpringBootApplication
+@MapperScan("com.nan.daymarkbackend.mapper")
+@EnableAspectJAutoProxy(exposeProxy = true)
 public class DaymarkBackendApplication {
 
     public static void main(String[] args) {
