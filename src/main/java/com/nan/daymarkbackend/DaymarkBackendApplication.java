@@ -1,15 +1,17 @@
 package com.nan.daymarkbackend;
 
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
 
-/**
- * Daymark 打卡系统启动类。
- */
 @SpringBootApplication
+@MapperScan("com.nan.daymarkbackend.mapper")
+@EnableAspectJAutoProxy(exposeProxy = true)
 public class DaymarkBackendApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(DaymarkBackendApplication.class, args);
     }
+
 }
