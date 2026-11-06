@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nan.daymarkbackend.constant.UserConstant;
 import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
+import com.nan.daymarkbackend.exception.ThrowUtils;
+import com.nan.daymarkbackend.model.dto.UserUpdateRequest;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.enums.UserRoleEnum;
 import com.nan.daymarkbackend.model.vo.LoginUserVO;
@@ -15,8 +17,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+import org.springframework.web.bind.annotation.RequestMapping;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+
+import java.util.Date;
 
 import static com.nan.daymarkbackend.constant.UserConstant.USER_LOGIN_STATE;
 
@@ -29,6 +35,9 @@ import static com.nan.daymarkbackend.constant.UserConstant.USER_LOGIN_STATE;
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     implements UserService{
+
+    @Resource
+    private UserMapper userMapper;
 
     /**
      *
@@ -80,6 +89,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return user.getId();
     }
 
+    /**
+     * 用户登录
+     * @param userAccount  用户账户
+     * @param userPassword 用户密码
+     * @param request
+     * @return
+     */
     @Override
     public LoginUserVO userLogin(String userAccount, String userPassword, HttpServletRequest request) {
         //1.校验
@@ -111,6 +127,64 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     /**
+     * 获取当前登录用户
+     * @param request
+     * @return
+     */
+    @Override
+    public User getLoginUser(HttpServletRequest request) {
+        // 先判断是否已登录
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        User currentUser = (User) userObj;
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        // 从数据库查询
+        long userId = currentUser.getId();
+        currentUser = this.getById(userId);
+        if (currentUser == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        return currentUser;
+
+    }
+
+    /**
+     * 修改个人信息
+     *
+     * @param userUpdateRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Long updateUser(UserUpdateRequest userUpdateRequest, User loginUser) {
+        ThrowUtils.throwIf(userUpdateRequest==null,ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser==null,ErrorCode.NOT_LOGIN_ERROR);
+        long loginUserId = loginUser.getId();
+        if(loginUserId<=0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        //如果是管理员，允许更新用户
+        if(!isAdmin(loginUser)){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        //判断要修改的用户是否存在
+        Long oldUserId = userUpdateRequest.getId();
+        ThrowUtils.throwIf(oldUserId==null,ErrorCode.PARAMS_ERROR);
+        User oldUser = this.getById(oldUserId);
+        ThrowUtils.throwIf(oldUser==null,ErrorCode.PARAMS_ERROR);
+        //修改
+        User newUser=new User();
+        BeanUtils.copyProperties(userUpdateRequest,newUser);
+        //操作数据库
+        boolean result = this.updateById(newUser);
+        ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"数据库操作失败");
+
+        //返回结果
+        return oldUserId;
+    }
+
+    /**
      * 加盐加密
      * @param userPassword
      * @return
@@ -139,26 +213,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     /**
-     * 获取当前登录用户
-     * @param request
+     * 判断是否为管理员
+     * @param user
      * @return
      */
     @Override
-    public User getLoginUser(HttpServletRequest request) {
-        // 先判断是否已登录
-        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
-        User currentUser = (User) userObj;
-        if (currentUser == null || currentUser.getId() == null) {
-            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
-        }
-        // 从数据库查询
-        long userId = currentUser.getId();
-        currentUser = this.getById(userId);
-        if (currentUser == null) {
-            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
-        }
-        return currentUser;
-
+    public boolean isAdmin(User user) {
+        return user != null && UserRoleEnum.ADMIN.getValue().equals(user.getUserRole());
     }
 }
 

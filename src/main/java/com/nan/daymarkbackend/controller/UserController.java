@@ -2,10 +2,12 @@ package com.nan.daymarkbackend.controller;
 
 import com.nan.daymarkbackend.common.BaseResponse;
 import com.nan.daymarkbackend.common.ResultUtils;
+import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.UserLoginRequest;
 import com.nan.daymarkbackend.model.dto.UserRegisterRequest;
+import com.nan.daymarkbackend.model.dto.UserUpdateRequest;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.vo.LoginUserVO;
 import com.nan.daymarkbackend.service.UserService;
@@ -60,6 +62,19 @@ public class UserController {
         return ResultUtils.success(userService.getLoginUserVO(user));
     }
 
+    //修改用户信息
+    @PostMapping("/update")
+    public BaseResponse<Long> updateUser(@RequestBody UserUpdateRequest userUpdateRequest, HttpServletRequest request) {
+        //校验参数是否为空
+        if (userUpdateRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        //获取当前用户
+        User loginUser = userService.getLoginUser(request);
+        //校验权限，触发更新
+        Long result = userService.updateUser(userUpdateRequest, loginUser);
+        return ResultUtils.success(result);
+    }
 
 
 }
