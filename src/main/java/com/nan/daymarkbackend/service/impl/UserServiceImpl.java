@@ -7,6 +7,7 @@ import com.nan.daymarkbackend.constant.UserConstant;
 import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
+import com.nan.daymarkbackend.model.dto.UserEditRequest;
 import com.nan.daymarkbackend.model.dto.UserUpdateRequest;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.enums.UserRoleEnum;
@@ -176,12 +177,36 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         //修改
         User newUser=new User();
         BeanUtils.copyProperties(userUpdateRequest,newUser);
+        //newUser.setUpdateTime(new Date());
         //操作数据库
         boolean result = this.updateById(newUser);
         ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"数据库操作失败");
 
         //返回结果
         return oldUserId;
+    }
+
+    @Override
+    public Long editUser(UserEditRequest userEditRequest, User loginUser) {
+        ThrowUtils.throwIf(userEditRequest==null,ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser==null,ErrorCode.NOT_LOGIN_ERROR);
+        long loginUserId = loginUser.getId();
+        if(loginUserId<=0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        //如果是管理员，允许更新用户
+        if(loginUserId!=userEditRequest.getId()){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        //修改
+        User newUser=new User();
+        BeanUtils.copyProperties(userEditRequest,newUser);
+        newUser.setEditTime(new Date());
+        //操作数据库
+        boolean result = this.updateById(newUser);
+        ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"数据库操作失败");
+
+        return userEditRequest.getId();
     }
 
     /**

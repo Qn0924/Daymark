@@ -1,5 +1,6 @@
 package com.nan.daymarkbackend.service;
 
+import com.nan.daymarkbackend.model.dto.UserEditRequest;
 import com.nan.daymarkbackend.model.dto.UserUpdateRequest;
 import com.nan.daymarkbackend.model.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -64,6 +65,14 @@ public interface UserService extends IService<User> {
      * @return
      */
     Long updateUser(UserUpdateRequest userUpdateRequest, User loginUser);
+
+    /**
+     * 编辑个人信息
+     * @param userEditRequest
+     * @param loginUser
+     * @return
+     */
+    Long editUser(UserEditRequest userEditRequest, User loginUser);
 
     /**
      * 判断是否为管理员
