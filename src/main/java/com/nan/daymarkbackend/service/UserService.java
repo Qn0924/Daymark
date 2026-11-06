@@ -2,6 +2,9 @@ package com.nan.daymarkbackend.service;
 
 import com.nan.daymarkbackend.model.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.nan.daymarkbackend.model.vo.LoginUserVO;
+
+import javax.servlet.http.HttpServletRequest;
 
 /**
 * @author 21289
@@ -21,9 +24,27 @@ public interface UserService extends IService<User> {
     long userRegister(String userAccount, String userPassword, String checkPassword);
 
     /**
+     * 用户登录
+     *
+     * @param userAccount  用户账户
+     * @param userPassword 用户密码
+     * @param request
+     * @return 脱敏后的用户信息
+     */
+    LoginUserVO userLogin(String userAccount, String userPassword, HttpServletRequest request);
+
+
+    /**
      * 密码加密
      * @param userPassword
      * @return
      */
     String getEncryptPassword(String userPassword);
+
+    /**
+     * 获得脱敏后的用户登录信息
+     * @param user
+     * @return
+     */
+    LoginUserVO getLoginUserVO(User user);
 }
