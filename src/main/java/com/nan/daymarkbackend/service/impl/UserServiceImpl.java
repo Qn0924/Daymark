@@ -186,6 +186,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return oldUserId;
     }
 
+    /**
+     * 编辑用户
+     * @param userEditRequest
+     * @param loginUser
+     * @return
+     */
     @Override
     public Long editUser(UserEditRequest userEditRequest, User loginUser) {
         ThrowUtils.throwIf(userEditRequest==null,ErrorCode.PARAMS_ERROR);
@@ -207,6 +213,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"数据库操作失败");
 
         return userEditRequest.getId();
+    }
+
+    /**
+     * 用户注销
+     * @param request
+     * @return
+     */
+    @Override
+    public boolean userLogout(HttpServletRequest request) {
+        // 先判断是否已登录
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        if (userObj == null) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "未登录");
+        }
+        // 移除登录态
+        request.getSession().removeAttribute(USER_LOGIN_STATE);
+        return true;
     }
 
     /**

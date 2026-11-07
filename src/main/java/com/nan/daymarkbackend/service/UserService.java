@@ -75,6 +75,15 @@ public interface UserService extends IService<User> {
     Long editUser(UserEditRequest userEditRequest, User loginUser);
 
     /**
+     * 用户注销
+     *
+     * @param request
+     * @return
+     */
+    boolean userLogout(HttpServletRequest request);
+
+
+    /**
      * 判断是否为管理员
      * @param user
      * @return
