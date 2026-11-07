@@ -1,17 +1,22 @@
 package com.nan.daymarkbackend.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nan.daymarkbackend.annotation.AuthCheck;
 import com.nan.daymarkbackend.constant.UserConstant;
 import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.UserEditRequest;
+import com.nan.daymarkbackend.model.dto.UserQueryRequest;
 import com.nan.daymarkbackend.model.dto.UserUpdateRequest;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.enums.UserRoleEnum;
 import com.nan.daymarkbackend.model.vo.LoginUserVO;
+import com.nan.daymarkbackend.model.vo.UserVO;
 import com.nan.daymarkbackend.service.UserService;
 import com.nan.daymarkbackend.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +28,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.nan.daymarkbackend.constant.UserConstant.USER_LOGIN_STATE;
 
@@ -158,26 +166,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public Long updateUser(UserUpdateRequest userUpdateRequest, User loginUser) {
         ThrowUtils.throwIf(userUpdateRequest==null,ErrorCode.PARAMS_ERROR);
-        ThrowUtils.throwIf(loginUser==null,ErrorCode.NOT_LOGIN_ERROR);
-        long loginUserId = loginUser.getId();
-        if(loginUserId<=0){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        //如果是管理员，允许更新用户
-        if(!isAdmin(loginUser)){
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
-        }
+
         //判断要修改的用户是否存在
         Long oldUserId = userUpdateRequest.getId();
         ThrowUtils.throwIf(oldUserId==null,ErrorCode.PARAMS_ERROR);
         User oldUser = this.getById(oldUserId);
         ThrowUtils.throwIf(oldUser==null,ErrorCode.PARAMS_ERROR);
+
         //修改
         User newUser=new User();
         BeanUtils.copyProperties(userUpdateRequest,newUser);
         //newUser.setUpdateTime(new Date());
+
         //操作数据库
         boolean result = this.updateById(newUser);
         ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"数据库操作失败");
@@ -233,6 +236,43 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     /**
+     * 查询参数
+     * @param userQueryRequest
+     * @return
+     */
+    @Override
+    public QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest) {
+        if (userQueryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+        Long id = userQueryRequest.getId();
+        String userAccount = userQueryRequest.getUserAccount();
+        String userName = userQueryRequest.getUserName();
+        String userAvatar = userQueryRequest.getUserAvatar();
+        String userProfile = userQueryRequest.getUserProfile();
+        String userRole = userQueryRequest.getUserRole();
+        Integer points = userQueryRequest.getPoints();
+        Integer continueDays = userQueryRequest.getContinueDays();
+        Date lastCheckinDate = userQueryRequest.getLastCheckinDate();
+        String sortField = userQueryRequest.getSortField();
+        String sortOrder = userQueryRequest.getSortOrder();
+
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq(ObjUtil.isNotNull(id), "id", id);
+        queryWrapper.eq(ObjUtil.isNotNull(points), "points", points);
+        queryWrapper.eq(ObjUtil.isNotNull(continueDays), "continueDays", continueDays);
+        queryWrapper.eq(lastCheckinDate != null, "lastCheckinDate", lastCheckinDate);
+        queryWrapper.eq(StrUtil.isNotBlank(userRole), "userRole", userRole);
+        queryWrapper.like(StrUtil.isNotBlank(userAccount), "userAccount", userAccount);
+        queryWrapper.like(StrUtil.isNotBlank(userName), "userName", userName);
+        queryWrapper.like(StrUtil.isNotBlank(userProfile), "userProfile", userProfile);
+        queryWrapper.like(StrUtil.isNotBlank(userAvatar), "userAvatar", userAvatar);
+        queryWrapper.orderBy(StrUtil.isNotEmpty(sortField), sortOrder.equals("ascend"), sortField);
+        return queryWrapper;
+    }
+
+
+    /**
      * 加盐加密
      * @param userPassword
      * @return
@@ -269,6 +309,37 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     public boolean isAdmin(User user) {
         return user != null && UserRoleEnum.ADMIN.getValue().equals(user.getUserRole());
     }
+
+    /**
+     * 获取单个脱敏后的用户信息
+     *
+     * @param user
+     * @return
+     */
+    @Override
+    public UserVO getUserVO(User user) {
+        if (user == null) {
+            return null;
+        }
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+        return userVO;
+    }
+
+    /**
+     * 获取脱敏后的用户信息列表
+     *
+     * @param userList
+     * @return
+     */
+    @Override
+    public List<UserVO> getUserVOList(List<User> userList) {
+        if (CollUtil.isEmpty(userList)) {
+            return new ArrayList<>();
+        }
+        return userList.stream().map(this::getUserVO).collect(Collectors.toList());
+    }
+
 }
 
 

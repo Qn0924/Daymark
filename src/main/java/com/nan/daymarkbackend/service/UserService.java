@@ -1,12 +1,16 @@
 package com.nan.daymarkbackend.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.nan.daymarkbackend.model.dto.UserEditRequest;
+import com.nan.daymarkbackend.model.dto.UserQueryRequest;
 import com.nan.daymarkbackend.model.dto.UserUpdateRequest;
 import com.nan.daymarkbackend.model.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.nan.daymarkbackend.model.vo.LoginUserVO;
+import com.nan.daymarkbackend.model.vo.UserVO;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
 * @author 21289
@@ -82,6 +86,12 @@ public interface UserService extends IService<User> {
      */
     boolean userLogout(HttpServletRequest request);
 
+    /**
+     * 查询参数
+     * @param userQueryRequest
+     * @return
+     */
+    QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
 
     /**
      * 判断是否为管理员
@@ -89,5 +99,21 @@ public interface UserService extends IService<User> {
      * @return
      */
     boolean isAdmin(User user);
+
+    /**
+     * 获取单个脱敏后的用户信息
+     *
+     * @param user
+     * @return
+     */
+    UserVO getUserVO(User user);
+
+    /**
+     * 获取脱敏后的用户信息列表
+     *
+     * @param userList
+     * @return
+     */
+    List<UserVO> getUserVOList(List<User> userList);
 
 }
