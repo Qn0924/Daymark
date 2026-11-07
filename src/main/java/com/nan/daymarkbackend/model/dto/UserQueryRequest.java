@@ -1,0 +1,63 @@
+package com.nan.daymarkbackend.model.dto;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.nan.daymarkbackend.common.PageRequest;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+import java.io.Serializable;
+import java.util.Date;
+
+@EqualsAndHashCode(callSuper = true)
+@Data
+public class UserQueryRequest extends PageRequest implements Serializable {
+    /**
+     * id
+     */
+    private Long id;
+
+    /**
+     * 账号
+     */
+    private String userAccount;
+
+    /**
+     * 用户昵称
+     */
+    private String userName;
+
+    /**
+     * 用户头像
+     */
+    private String userAvatar;
+
+    /**
+     * 用户简介
+     */
+    private String userProfile;
+
+    /**
+     * 用户角色：user/admin/vip
+     */
+    private String userRole;
+
+    /**
+     * 当前积分余额
+     */
+    private Integer points;
+
+    /**
+     * 连续打卡天数
+     */
+    private Integer continueDays;
+
+    /**
+     * 上次有效打卡日期
+     */
+    private Date lastCheckinDate;
+
+    private static final long serialVersionUID = 1L;
+}
