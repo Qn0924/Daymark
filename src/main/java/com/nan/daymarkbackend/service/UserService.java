@@ -2,6 +2,7 @@ package com.nan.daymarkbackend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.nan.daymarkbackend.model.dto.UserEditRequest;
+import com.nan.daymarkbackend.model.dto.UserPasswordUpdateRequest;
 import com.nan.daymarkbackend.model.dto.UserQueryRequest;
 import com.nan.daymarkbackend.model.dto.UserUpdateRequest;
 import com.nan.daymarkbackend.model.entity.User;
@@ -115,5 +116,14 @@ public interface UserService extends IService<User> {
      * @return
      */
     List<UserVO> getUserVOList(List<User> userList);
+
+    /**
+     * 修改密码
+     *
+     * @param userPasswordUpdateRequest
+     * @param loginUser
+     * @return
+     */
+    boolean updateUserPassword(UserPasswordUpdateRequest userPasswordUpdateRequest, User loginUser);
 
 }

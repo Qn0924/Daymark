@@ -11,6 +11,7 @@ import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.UserEditRequest;
+import com.nan.daymarkbackend.model.dto.UserPasswordUpdateRequest;
 import com.nan.daymarkbackend.model.dto.UserQueryRequest;
 import com.nan.daymarkbackend.model.dto.UserUpdateRequest;
 import com.nan.daymarkbackend.model.entity.User;
@@ -338,6 +339,53 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             return new ArrayList<>();
         }
         return userList.stream().map(this::getUserVO).collect(Collectors.toList());
+    }
+
+    /**
+     * 修改密码
+     *
+     * @param userPasswordUpdateRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public boolean updateUserPassword(UserPasswordUpdateRequest userPasswordUpdateRequest, User loginUser) {
+        ThrowUtils.throwIf(userPasswordUpdateRequest == null, ErrorCode.PARAMS_ERROR);
+        //校验要修改密码的用户是否存在
+        Long userId = userPasswordUpdateRequest.getId();
+        ThrowUtils.throwIf(userId<0,ErrorCode.NOT_FOUND_ERROR);
+        if(!isAdmin(loginUser)&& !loginUser.getId().equals(userId)){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        //比对输入的旧密码是否与原密码一致
+        User user = this.getById(userId);
+        ThrowUtils.throwIf(user==null,ErrorCode.NOT_FOUND_ERROR);
+        String oldPassword = userPasswordUpdateRequest.getOldPassword();
+        String newPassword = userPasswordUpdateRequest.getNewPassword();
+        String checkPassword = userPasswordUpdateRequest.getCheckPassword();
+        if (StrUtil.hasBlank(oldPassword, newPassword, checkPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
+        }
+        ThrowUtils.throwIf(oldPassword.length()<8,ErrorCode.PARAMS_ERROR,"旧输入密码过短");
+        String oldEncryptPassword = this.getEncryptPassword(oldPassword);
+        if(!oldEncryptPassword.equals(user.getUserPassword())){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"旧密码输入错误！");
+        }
+        //校验合法性
+        ThrowUtils.throwIf(newPassword.length()<8,ErrorCode.PARAMS_ERROR,"新输入密码过短");
+        //输入确认密码
+        ThrowUtils.throwIf(checkPassword.length()<8,ErrorCode.PARAMS_ERROR,"确认输入密码过短");
+        if(!newPassword.equals(checkPassword)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"新密码与确认密码不符合");
+        }
+        //操作数据库
+        String newEncryptPassword = this.getEncryptPassword(newPassword);
+        User updateUser = new User();
+        updateUser.setId(userId);
+        updateUser.setUserPassword(newEncryptPassword);
+        boolean result = this.updateById(updateUser);
+        ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"数据库操作失败");
+        return true;
     }
 
 }

@@ -183,6 +183,19 @@ public class UserController {
         return ResultUtils.success(userVOPage);
     }
 
-
+    /**
+     * 修改密码
+     * @param userPasswordUpdateRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/update/password")
+    public BaseResponse<Boolean> updateUserPassword(@RequestBody UserPasswordUpdateRequest userPasswordUpdateRequest,
+                                                    HttpServletRequest request){
+        ThrowUtils.throwIf(userPasswordUpdateRequest==null,ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        boolean result = userService.updateUserPassword(userPasswordUpdateRequest, loginUser);
+        return ResultUtils.success(result);
+    }
 
 }
