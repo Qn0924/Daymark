@@ -18,6 +18,6 @@ public interface TaskRecordService extends IService<TaskRecord> {
      * @param loginUser
      * @return
      */
-    Long AddTask(TaskAddRequest taskAddRequest, User loginUser);
+    Long addTask(TaskAddRequest taskAddRequest, User loginUser);
 
 }
