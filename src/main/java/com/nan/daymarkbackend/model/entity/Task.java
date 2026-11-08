@@ -10,9 +10,9 @@ import lombok.Data;
  * 任务与打卡合并宽表
  * @TableName task_record
  */
-@TableName(value ="task_record")
+@TableName(value ="task")
 @Data
-public class TaskRecord implements Serializable {
+public class Task implements Serializable {
     /**
      * 打卡记录id
      */

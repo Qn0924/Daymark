@@ -1,6 +1,6 @@
 package com.nan.daymarkbackend.mapper;
 
-import com.nan.daymarkbackend.model.entity.TaskRecord;
+import com.nan.daymarkbackend.model.entity.Task;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 /**
@@ -9,7 +9,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 * @createDate 2026-11-08 17:08:34
 * @Entity com.nan.daymarkbackend.model.entity.TaskRecord
 */
-public interface TaskRecordMapper extends BaseMapper<TaskRecord> {
+public interface TaskMapper extends BaseMapper<Task> {
 
 }
 

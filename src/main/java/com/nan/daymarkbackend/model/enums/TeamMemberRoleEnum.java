@@ -3,6 +3,9 @@ package com.nan.daymarkbackend.model.enums;
 import cn.hutool.core.util.ObjUtil;
 import lombok.Getter;
 
+/**
+ * 团队成员枚举类
+ */
 @Getter
 public enum TeamMemberRoleEnum {
 

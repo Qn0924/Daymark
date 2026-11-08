@@ -3,6 +3,9 @@ package com.nan.daymarkbackend.model.enums;
 import cn.hutool.core.util.ObjUtil;
 import lombok.Getter;
 
+/**
+ * 加入团队方式枚举类
+ */
 @Getter
 public enum TeamJoinTypeEnum {
 

@@ -6,7 +6,7 @@ import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.task.TaskAddRequest;
 import com.nan.daymarkbackend.model.entity.User;
-import com.nan.daymarkbackend.service.TaskRecordService;
+import com.nan.daymarkbackend.service.TaskService;
 import com.nan.daymarkbackend.service.UserService;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,7 +24,7 @@ public class TaskController {
     private UserService userService;
 
     @Resource
-    private TaskRecordService taskRecordService;
+    private TaskService taskRecordService;
 
     /**
      * 添加任务

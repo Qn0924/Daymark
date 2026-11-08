@@ -1,18 +1,20 @@
 package com.nan.daymarkbackend.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.task.TaskAddRequest;
-import com.nan.daymarkbackend.model.entity.TaskRecord;
+import com.nan.daymarkbackend.model.dto.task.TaskAuditRequest;
+import com.nan.daymarkbackend.model.entity.Task;
 import com.nan.daymarkbackend.model.entity.Team;
 import com.nan.daymarkbackend.model.entity.TeamMember;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.enums.*;
-import com.nan.daymarkbackend.service.TaskRecordService;
-import com.nan.daymarkbackend.mapper.TaskRecordMapper;
+import com.nan.daymarkbackend.service.TaskService;
+import com.nan.daymarkbackend.mapper.TaskMapper;
 import com.nan.daymarkbackend.service.TeamMemberService;
 import com.nan.daymarkbackend.service.TeamService;
 import org.springframework.stereotype.Service;
@@ -27,8 +29,8 @@ import java.util.Date;
 * @createDate 2026-11-08 17:08:34
 */
 @Service
-public class TaskRecordServiceImpl extends ServiceImpl<TaskRecordMapper, TaskRecord>
-    implements TaskRecordService{
+public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
+    implements TaskService {
 
     @Resource
     private TeamService teamService;
@@ -85,7 +87,7 @@ public class TaskRecordServiceImpl extends ServiceImpl<TaskRecordMapper, TaskRec
 
         //创建任务
         Long taskId = IdWorker.getId();
-        TaskRecord taskRecord = new TaskRecord();
+        Task taskRecord = new Task();
         taskRecord.setTaskId(taskId);
         taskRecord.setTeamId(team.getId());
         taskRecord.setCreatorUserId(loginUser.getId());
@@ -104,6 +106,32 @@ public class TaskRecordServiceImpl extends ServiceImpl<TaskRecordMapper, TaskRec
 
         return taskRecord.getTaskId();
 
+    }
+
+    /**
+     * 管理员审核任务
+     * @param taskAuditRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean auditTask(TaskAuditRequest taskAuditRequest, User loginUser) {
+        //校验参数
+        ThrowUtils.throwIf(taskAuditRequest==null,ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        Task task=this.lambdaQuery()
+                .eq(Task::getTaskId,taskAuditRequest.getTaskId())
+                .isNull(Task::getUserId)
+                .one();
+        ThrowUtils.throwIf(task == null, ErrorCode.NOT_FOUND_ERROR, "任务不存在");
+        ThrowUtils.throwIf(!TaskStatusEnum.PENDING.getValue().equals(task.getTaskStatus()), ErrorCode.OPERATION_ERROR,"该任务不在审核状态");
+
+        Date todayStart = DateUtil.beginOfDay(new Date());
+        ThrowUtils.throwIf(task.getEndDate() == null || task.getEndDate().before(todayStart), ErrorCode.PARAMS_ERROR, "任务结束日期已过，无法通过审核");
+
+        return true;
     }
 }
 
