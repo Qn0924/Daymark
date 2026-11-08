@@ -1,9 +1,5 @@
-package com.nan.daymarkbackend.model.dto;
+package com.nan.daymarkbackend.model.dto.user;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.nan.daymarkbackend.common.PageRequest;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

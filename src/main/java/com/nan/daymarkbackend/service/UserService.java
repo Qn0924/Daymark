@@ -1,10 +1,10 @@
 package com.nan.daymarkbackend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.nan.daymarkbackend.model.dto.UserEditRequest;
-import com.nan.daymarkbackend.model.dto.UserPasswordUpdateRequest;
-import com.nan.daymarkbackend.model.dto.UserQueryRequest;
-import com.nan.daymarkbackend.model.dto.UserUpdateRequest;
+import com.nan.daymarkbackend.model.dto.user.UserEditRequest;
+import com.nan.daymarkbackend.model.dto.user.UserPasswordUpdateRequest;
+import com.nan.daymarkbackend.model.dto.user.UserQueryRequest;
+import com.nan.daymarkbackend.model.dto.user.UserUpdateRequest;
 import com.nan.daymarkbackend.model.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.nan.daymarkbackend.model.vo.LoginUserVO;

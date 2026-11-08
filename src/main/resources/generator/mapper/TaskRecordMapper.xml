@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nan.daymarkbackend.mapper.TaskRecordMapper">
+
+    <resultMap id="BaseResultMap" type="com.nan.daymarkbackend.model.entity.TaskRecord">
+            <id property="id" column="id" />
+            <result property="taskId" column="taskId" />
+            <result property="teamId" column="teamId" />
+            <result property="creatorUserId" column="creatorUserId" />
+            <result property="taskName" column="taskName" />
+            <result property="taskCategory" column="taskCategory" />
+            <result property="description" column="description" />
+            <result property="requireDuration" column="requireDuration" />
+            <result property="requirePhoto" column="requirePhoto" />
+            <result property="startDate" column="startDate" />
+            <result property="endDate" column="endDate" />
+            <result property="taskStatus" column="taskStatus" />
+            <result property="auditTime" column="auditTime" />
+            <result property="taskCreateTime" column="taskCreateTime" />
+            <result property="userId" column="userId" />
+            <result property="checkinDate" column="checkinDate" />
+            <result property="checkinTime" column="checkinTime" />
+            <result property="duration" column="duration" />
+            <result property="photoUrl" column="photoUrl" />
+            <result property="recordStatus" column="recordStatus" />
+            <result property="points" column="points" />
+            <result property="createTime" column="createTime" />
+            <result property="updateTime" column="updateTime" />
+            <result property="isDelete" column="isDelete" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,taskId,teamId,creatorUserId,taskName,taskCategory,
+        description,requireDuration,requirePhoto,startDate,endDate,
+        taskStatus,auditTime,taskCreateTime,userId,checkinDate,
+        checkinTime,duration,photoUrl,recordStatus,points,
+        createTime,updateTime,isDelete
+    </sql>
+</mapper>

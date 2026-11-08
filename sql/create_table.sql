@@ -23,7 +23,7 @@ create table if not exists user
 create table if not exists task_record
 (
     id              bigint auto_increment comment '打卡记录id' primary key,
-    taskId          bigint                                 not null comment '任务id（原task.id）',
+    taskId          bigint                                 not null comment '任务id',
     teamId          bigint                                 not null comment '所属团队id',
     creatorUserId   bigint                                 not null comment '任务创建人用户id',
     taskName        varchar(256)                           not null comment '任务名称',
@@ -54,3 +54,96 @@ create table if not exists task_record
     INDEX idx_userId_date   (userId, checkinDate),
     INDEX idx_team_status   (teamId, taskStatus)
     ) comment '任务与打卡合并宽表' collate = utf8mb4_unicode_ci;
+
+-- 学习计时表
+create table if not exists studyTime
+(
+    id                bigint auto_increment comment 'id' primary key,
+    userId            bigint                                 not null comment '用户id',
+    taskId            bigint                                 not null comment '打卡任务id',
+    teamId            bigint                                 not null comment '所属打卡团id',
+    startTime         datetime                               not null comment '开始学习时间',
+    endTime           datetime                               null comment '结束学习时间',
+    duration          int                                    null comment '计算出的时长，单位分钟',
+    status            varchar(32)  default 'running'         not null comment '状态：running进行中/finished已结束/abandoned已放弃/expired已作废',
+    lastHeartbeatTime datetime                               null comment '最后心跳时间',
+    createTime        datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
+    updateTime        datetime     default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    isDelete          tinyint      default 0                 not null comment '是否删除',
+    INDEX idx_userId_status (userId, status),
+    INDEX idx_taskId (taskId)
+    ) comment '学习计时' collate = utf8mb4_unicode_ci;
+
+-- 积分流水表
+create table if not exists point_record
+(
+    id          bigint auto_increment comment 'id' primary key,
+    userId      bigint                                 not null comment '用户id',
+    recordId    bigint                                 null comment '打卡记录id',
+    points      int                                    not null comment '积分变动值，正数增加，负数扣减',
+    source      varchar(32)                            not null comment '来源：checkin打卡/makeup补卡/break断卡',
+    description varchar(512)                           null comment '描述',
+    createTime  datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
+    isDelete    tinyint      default 0                 null comment '是否删除',
+    INDEX idx_userId (userId),
+    INDEX idx_recordId (recordId)
+    ) comment '积分流水' collate = utf8mb4_unicode_ci;
+
+-- 团队表
+create table if not exists team
+(
+    id          bigint auto_increment comment 'id' primary key,
+    teamName    varchar(256)                           not null comment '团队名称',
+    description varchar(512)                           null comment '团队简介',
+    ownerUserId bigint                                 not null comment '负责人用户id，关联 user.id',
+    status      varchar(32)  default 'pending'         not null comment '状态：pending待审核/active正常/rejected已驳回/closed已解散',
+    createTime  datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
+    updateTime  datetime     default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    isDelete    tinyint      default 0                 not null comment '是否删除',
+    INDEX idx_ownerUserId (ownerUserId),
+    INDEX idx_status (status)
+    ) comment '团队' collate = utf8mb4_unicode_ci;
+
+-- 团队成员表
+create table if not exists team_member
+(
+    id             bigint auto_increment comment 'id' primary key,
+    teamId         bigint                                 not null comment '团队id',
+    userId         bigint                                 not null comment '用户id',
+
+    role           varchar(32)  default 'worker'          not null comment '角色：owner负责人/worker普通成员/mentor监督者',
+    status         varchar(32)  default 'pending'         not null comment '状态：pending待审批/active正常/rejected已拒绝/left已退出/removed已移除/cancelled已取消',
+    joinType       varchar(32)  default 'apply'           not null comment '加入方式：create创建/apply申请/invite邀请/admin管理员授予',
+
+    applyReason    varchar(512)                           null comment '申请理由或邀请留言',
+    inviterUserId  bigint                                 null comment '邀请人/授予人用户id',
+    reviewerUserId bigint                                 null comment '审批人用户id',
+    reviewTime     datetime                               null comment '审批时间',
+    reviewRemark   varchar(512)                           null comment '审批意见',
+
+    joinTime       datetime                               null comment '正式加入/授予时间',
+    leaveTime      datetime                               null comment '退出/移除时间',
+    leaveReason    varchar(512)                           null comment '退出/移除原因',
+    leaveUserId    bigint                                 null comment '退出/移除操作人id',
+
+    createTime     datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
+    updateTime     datetime     default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    isDelete       tinyint      default 0                 not null comment '是否删除',
+
+    UNIQUE KEY uk_team_user (teamId, userId),
+    INDEX idx_teamId_status (teamId, status, role),
+    INDEX idx_userId_status (userId, status, role)
+    ) comment '团队成员' collate = utf8mb4_unicode_ci;
+
+-- 修改打卡任务表
+alter table task_record
+    modify column userId bigint null comment '打卡用户id，任务定义行为null';
+
+alter table task_record
+    modify column checkinDate date null comment '打卡日期，任务定义行为null';
+
+alter table task_record
+    modify column checkinTime datetime null comment '打卡时间，任务定义行为null';
+
+alter table task_record
+    modify column duration int null comment '本次学习时长，分钟，任务定义行为null';

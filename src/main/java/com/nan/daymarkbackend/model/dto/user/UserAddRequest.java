@@ -1,18 +1,15 @@
-package com.nan.daymarkbackend.model.dto;
+package com.nan.daymarkbackend.model.dto.user;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
 import lombok.Data;
 
 import java.io.Serializable;
 import java.util.Date;
 
+/**
+ * 新增用户
+ */
 @Data
-public class UserUpdateRequest implements Serializable {
-
-    private static final long serialVersionUID = 1618383174323152623L;
+public class UserAddRequest implements Serializable {
     /**
      * id
      */
@@ -58,14 +55,5 @@ public class UserUpdateRequest implements Serializable {
      */
     private Date lastCheckinDate;
 
-    /**
-     * 更新时间
-     */
-    private Date updateTime;
-
-    /**
-     * 是否删除
-     */
-    private Integer isDelete;
-
+    private static final long serialVersionUID = 1L;
 }

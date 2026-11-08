@@ -1,4 +1,4 @@
-package com.nan.daymarkbackend.model.dto;
+package com.nan.daymarkbackend.model.dto.user;
 
 import lombok.Data;
 
