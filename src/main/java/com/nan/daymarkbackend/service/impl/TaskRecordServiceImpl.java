@@ -10,6 +10,7 @@ import com.nan.daymarkbackend.model.entity.TaskRecord;
 import com.nan.daymarkbackend.model.entity.Team;
 import com.nan.daymarkbackend.model.entity.TeamMember;
 import com.nan.daymarkbackend.model.entity.User;
+import com.nan.daymarkbackend.model.enums.*;
 import com.nan.daymarkbackend.service.TaskRecordService;
 import com.nan.daymarkbackend.mapper.TaskRecordMapper;
 import com.nan.daymarkbackend.service.TeamMemberService;
@@ -69,16 +70,16 @@ public class TaskRecordServiceImpl extends ServiceImpl<TaskRecordMapper, TaskRec
         team.setTeamName(taskName + "打卡团");
         team.setDescription(description);
         team.setOwnerUserId(loginUser.getId());
-        team.setStatus("pending");
+        team.setStatus(TeamStatusEnum.PENDING.getValue());
         ThrowUtils.throwIf(!teamService.save(team), ErrorCode.OPERATION_ERROR, "创建打卡团失败");
 
         //创建人自动为团长（团成员）
         TeamMember teamMember = new TeamMember();
         teamMember.setTeamId(team.getId());
         teamMember.setUserId(loginUser.getId());
-        teamMember.setRole("owner");
-        teamMember.setStatus("active");
-        teamMember.setJoinType("create");
+        teamMember.setRole(TeamMemberRoleEnum.OWNER.getValue());
+        teamMember.setStatus(TeamMemberStatusEnum.ACTIVE.getValue());
+        teamMember.setJoinType(TeamJoinTypeEnum.CREATE.getValue());
         teamMember.setJoinTime(new Date());
         ThrowUtils.throwIf(!teamMemberService.save(teamMember), ErrorCode.OPERATION_ERROR, "创建团长失败");
 
@@ -95,7 +96,7 @@ public class TaskRecordServiceImpl extends ServiceImpl<TaskRecordMapper, TaskRec
         taskRecord.setRequirePhoto(taskAddRequest.getRequirePhoto());
         taskRecord.setStartDate(startDate);
         taskRecord.setEndDate(endDate);
-        taskRecord.setTaskStatus("pending");
+        taskRecord.setTaskStatus(TaskStatusEnum.PENDING.getValue());
         taskRecord.setTaskCreateTime(new Date());
         taskRecord.setRecordStatus("normal");
         taskRecord.setPoints(0);
