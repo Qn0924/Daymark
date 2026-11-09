@@ -4,10 +4,12 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.task.TaskAddRequest;
 import com.nan.daymarkbackend.model.dto.task.TaskAuditRequest;
+import com.nan.daymarkbackend.model.dto.task.TaskResubmitRequest;
 import com.nan.daymarkbackend.model.entity.Task;
 import com.nan.daymarkbackend.model.entity.Team;
 import com.nan.daymarkbackend.model.entity.TeamMember;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.Arrays;
 import java.util.Date;
 
 /**
@@ -56,7 +59,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         ThrowUtils.throwIf(taskName.length() > 250, ErrorCode.PARAMS_ERROR, "任务名不能超过 250 个字符");
 
         String description = taskAddRequest.getDescription();
-        ThrowUtils.throwIf(description.length() > 512, ErrorCode.PARAMS_ERROR, "任务说明不能超过 512 个字符");
+        ThrowUtils.throwIf(description!=null&&description.length() > 512, ErrorCode.PARAMS_ERROR, "任务说明不能超过 512 个字符");
 
         Integer requireDuration = taskAddRequest.getRequireDuration();
         ThrowUtils.throwIf(requireDuration == null || requireDuration <= 0 || requireDuration > 480, ErrorCode.PARAMS_ERROR, "要求时长必须在 1~480 分钟之间");
@@ -66,6 +69,8 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         Date endDate = taskAddRequest.getEndDate();
         ThrowUtils.throwIf(startDate == null || endDate == null, ErrorCode.PARAMS_ERROR, "任务起止时间不能为空");
         ThrowUtils.throwIf(endDate.before(startDate), ErrorCode.PARAMS_ERROR, "任务结束日期不能早于开始日期");
+        Date tomorrowStart = DateUtil.beginOfDay(DateUtil.tomorrow());
+        ThrowUtils.throwIf(endDate.before(tomorrowStart), ErrorCode.PARAMS_ERROR, "任务结束日期不满足要求，无法通过审核");
 
         //创建打卡团队
         Team team = new Team();
@@ -120,16 +125,126 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         //校验参数
         ThrowUtils.throwIf(taskAuditRequest==null,ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR);
+        String newTaskStatus;
+        Boolean approved = taskAuditRequest.getApproved();
+        ThrowUtils.throwIf(approved==null,ErrorCode.PARAMS_ERROR,"未给审核结果");
 
+        //查任务定义行
         Task task=this.lambdaQuery()
                 .eq(Task::getTaskId,taskAuditRequest.getTaskId())
                 .isNull(Task::getUserId)
                 .one();
-        ThrowUtils.throwIf(task == null, ErrorCode.NOT_FOUND_ERROR, "任务不存在");
-        ThrowUtils.throwIf(!TaskStatusEnum.PENDING.getValue().equals(task.getTaskStatus()), ErrorCode.OPERATION_ERROR,"该任务不在审核状态");
+        if(task==null){
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR,"任务不存在");
+        }
+        if(!TaskStatusEnum.PENDING.getValue().equals(task.getTaskStatus())){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"任务已审核过");
+        }
 
-        Date todayStart = DateUtil.beginOfDay(new Date());
-        ThrowUtils.throwIf(task.getEndDate() == null || task.getEndDate().before(todayStart), ErrorCode.PARAMS_ERROR, "任务结束日期已过，无法通过审核");
+        //操作数据库更新status值
+        if(!approved){
+            newTaskStatus=TaskStatusEnum.REJECTED.getValue();
+        }else {
+            Date tomorrowStart = DateUtil.beginOfDay(DateUtil.tomorrow());
+            ThrowUtils.throwIf(task.getEndDate() == null || task.getEndDate().before(tomorrowStart), ErrorCode.PARAMS_ERROR, "任务已过期，无法通过，请驳回让创建者修改");
+            newTaskStatus = TaskStatusEnum.OPEN.getValue();
+        }
+        boolean taskResult = this.lambdaUpdate()
+                .eq(Task::getTaskId, taskAuditRequest.getTaskId())
+                .isNull(Task::getUserId)
+                .eq(Task::getTaskStatus, TaskStatusEnum.PENDING.getValue())
+                .set(Task::getTaskStatus, newTaskStatus)
+                .set(Task::getAuditTime, new Date())
+                .update();
+        ThrowUtils.throwIf(!taskResult,ErrorCode.OPERATION_ERROR,"数据库操作失败");
+
+        //更新团队status值
+        String newTeamStatus;
+        if(!approved){
+            newTeamStatus=TeamStatusEnum.REJECTED.getValue();
+        }else {
+            newTeamStatus = TeamStatusEnum.ACTIVE.getValue();
+        }
+
+        boolean teamResult = teamService.lambdaUpdate()
+                .eq(Team::getId, task.getTeamId())
+                .eq(Team::getStatus, TeamStatusEnum.PENDING.getValue())
+                .set(Team::getStatus, newTeamStatus)
+                .set(Team::getTeamName,task.getTaskName()+"打卡团")
+                .update();
+        ThrowUtils.throwIf(!teamResult, ErrorCode.OPERATION_ERROR, "打卡团状态异常");
+
+        return true;
+    }
+
+    /**
+     * 重新提交任务
+     * @param taskResubmitRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean resubmitTask(TaskResubmitRequest taskResubmitRequest, User loginUser) {
+        ThrowUtils.throwIf(taskResubmitRequest==null,ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser==null,ErrorCode.NOT_LOGIN_ERROR,"未登录");
+        //校验参数
+        String taskName = StrUtil.trim(taskResubmitRequest.getTaskName());
+        ThrowUtils.throwIf(StrUtil.isBlank(taskName), ErrorCode.PARAMS_ERROR, "任务名不能为空");
+        ThrowUtils.throwIf(taskName.length() > 250, ErrorCode.PARAMS_ERROR, "任务名不能超过 250 个字符");
+
+        String description = taskResubmitRequest.getDescription();
+        ThrowUtils.throwIf(description!=null&&description.length() > 512, ErrorCode.PARAMS_ERROR, "任务说明不能超过 512 个字符");
+
+        Integer requireDuration = taskResubmitRequest.getRequireDuration();
+        ThrowUtils.throwIf(requireDuration == null || requireDuration <= 0 || requireDuration > 480, ErrorCode.PARAMS_ERROR, "要求时长必须在 1~480 分钟之间");
+
+        Date tomorrowStart = DateUtil.beginOfDay(DateUtil.tomorrow());
+        ThrowUtils.throwIf(taskResubmitRequest.getEndDate() == null || taskResubmitRequest.getEndDate().before(tomorrowStart), ErrorCode.PARAMS_ERROR, "任务结束日期不满足要求，无法通过审核");
+
+        //查询查询提交修改的任务
+        Task task = this.lambdaQuery()
+                .eq(Task::getTaskId, taskResubmitRequest.getTaskId())
+                .isNull(Task::getUserId)
+                .one();
+        ThrowUtils.throwIf(task == null, ErrorCode.NOT_FOUND_ERROR, "任务不存在");
+
+        ThrowUtils.throwIf(!task.getCreatorUserId().equals(loginUser.getId()),
+                ErrorCode.NO_AUTH_ERROR, "只有任务创建者可以重新提交");
+
+        ThrowUtils.throwIf(!TaskStatusEnum.PENDING.getValue().equals(task.getTaskStatus()) && !TaskStatusEnum.REJECTED.getValue().equals(task.getTaskStatus()),
+                ErrorCode.OPERATION_ERROR, "当前状态不允许修改任务信息");
+
+        Date endDate = taskResubmitRequest.getEndDate();
+        ThrowUtils.throwIf(task.getStartDate() != null && endDate.before(task.getStartDate()),
+                ErrorCode.PARAMS_ERROR, "结束日期不能早于开始日期");
+
+        //回到待审核
+        boolean taskResult = this.lambdaUpdate()
+                .eq(Task::getTaskId, taskResubmitRequest.getTaskId())
+                .isNull(Task::getUserId)
+                .in(Task::getTaskStatus, Arrays.asList(
+                        TaskStatusEnum.PENDING.getValue(),
+                        TaskStatusEnum.REJECTED.getValue()))
+                .set(Task::getTaskName, taskName)
+                .set(Task::getDescription, description)
+                .set(Task::getRequireDuration, requireDuration)
+                .set(Task::getEndDate, endDate)
+                .set(Task::getTaskStatus, TaskStatusEnum.PENDING.getValue())
+                .set(Task::getAuditTime, null)
+                .update();
+        ThrowUtils.throwIf(!taskResult, ErrorCode.OPERATION_ERROR, "数据库任务更新失败");
+
+        //团队回到待审核
+        boolean teamUpdated = teamService.lambdaUpdate()
+                .eq(Team::getId, task.getTeamId())
+                .in(Team::getStatus, Arrays.asList(
+                        TeamStatusEnum.PENDING.getValue(),
+                        TeamStatusEnum.REJECTED.getValue()))
+                .set(Team::getStatus, TeamStatusEnum.PENDING.getValue())
+                .set(Team::getTeamName,taskName+"打卡团")
+                .update();
+        ThrowUtils.throwIf(!teamUpdated, ErrorCode.OPERATION_ERROR, "数据库团队更新失败");
 
         return true;
     }
