@@ -11,6 +11,7 @@ import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.task.TaskAddRequest;
 import com.nan.daymarkbackend.model.dto.task.TaskAuditRequest;
+import com.nan.daymarkbackend.model.dto.task.TaskQueryRequest;
 import com.nan.daymarkbackend.model.dto.task.TaskResubmitRequest;
 import com.nan.daymarkbackend.model.entity.Task;
 import com.nan.daymarkbackend.model.entity.User;
@@ -84,6 +85,19 @@ public class TaskController {
         ThrowUtils.throwIf(taskResubmitRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(request);
         return ResultUtils.success(taskService.resubmitTask(taskResubmitRequest, loginUser));
+    }
+
+    /**
+     * 我创建的任务接口
+     * @param taskQueryRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/my/list/page")
+    public BaseResponse<Page<Task>> listMyTask(@RequestBody TaskQueryRequest taskQueryRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(taskQueryRequest==null,ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(taskService.listMyTask(taskQueryRequest, loginUser));
     }
 
 }

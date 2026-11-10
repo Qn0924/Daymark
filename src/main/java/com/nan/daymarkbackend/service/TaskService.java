@@ -1,7 +1,9 @@
 package com.nan.daymarkbackend.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.nan.daymarkbackend.model.dto.task.TaskAddRequest;
 import com.nan.daymarkbackend.model.dto.task.TaskAuditRequest;
+import com.nan.daymarkbackend.model.dto.task.TaskQueryRequest;
 import com.nan.daymarkbackend.model.dto.task.TaskResubmitRequest;
 import com.nan.daymarkbackend.model.entity.Task;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -32,7 +34,21 @@ public interface TaskService extends IService<Task> {
 
     /**
      * 重新提交任务
+     *
+     * @param taskResubmitRequest
+     * @param loginUser
+     * @return
      */
     Boolean resubmitTask(TaskResubmitRequest taskResubmitRequest, User loginUser);
+
+    /**
+     * 查询我的创建任务
+     * @param taskQueryRequest
+     * @param loginUser
+     * @return
+     */
+    Page<Task> listMyTask(TaskQueryRequest taskQueryRequest, User loginUser);
+
+
 
 }

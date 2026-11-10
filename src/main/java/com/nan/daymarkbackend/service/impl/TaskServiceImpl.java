@@ -2,13 +2,17 @@ package com.nan.daymarkbackend.service.impl;
 
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.task.TaskAddRequest;
 import com.nan.daymarkbackend.model.dto.task.TaskAuditRequest;
+import com.nan.daymarkbackend.model.dto.task.TaskQueryRequest;
 import com.nan.daymarkbackend.model.dto.task.TaskResubmitRequest;
 import com.nan.daymarkbackend.model.entity.Task;
 import com.nan.daymarkbackend.model.entity.Team;
@@ -247,6 +251,37 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         ThrowUtils.throwIf(!teamUpdated, ErrorCode.OPERATION_ERROR, "数据库团队更新失败");
 
         return true;
+    }
+
+    /**
+     * 查询我创建的任务
+     * @param taskQueryRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Page<Task> listMyTask(TaskQueryRequest taskQueryRequest, User loginUser) {
+        ThrowUtils.throwIf(taskQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null,ErrorCode.NOT_LOGIN_ERROR);
+
+        long current = taskQueryRequest.getCurrent();
+        long pageSize = taskQueryRequest.getPageSize();
+        ThrowUtils.throwIf(current <= 0 || pageSize <= 0, ErrorCode.PARAMS_ERROR, "分页参数不合法");
+
+        QueryWrapper<Task> queryWrapper = new QueryWrapper<Task>()
+                .eq("creatorUserId", loginUser.getId())
+                .isNull("userId")
+                .eq(StrUtil.isNotBlank(taskQueryRequest.getTaskCategory()), "taskCategory", taskQueryRequest.getTaskCategory())
+                .like(StrUtil.isNotBlank(taskQueryRequest.getTaskName()), "taskName", StrUtil.trim(taskQueryRequest.getTaskName()));
+
+        if (StrUtil.isNotBlank(taskQueryRequest.getTaskStatus())) {
+            // 用枚举校验，防止传入任意字符串
+            ThrowUtils.throwIf(TaskStatusEnum.getEnumByValue(taskQueryRequest.getTaskStatus()) == null, ErrorCode.PARAMS_ERROR, "任务状态不合法");
+            queryWrapper.eq("taskStatus", taskQueryRequest.getTaskStatus());
+        }
+
+        queryWrapper.orderByDesc("taskCreateTime");
+        return this.page(new Page<>(current, pageSize), queryWrapper);
     }
 }
 

@@ -144,3 +144,4 @@ create table if not exists team_member
     INDEX idx_userId_status (userId, status, role)
     ) comment '团队成员' collate = utf8mb4_unicode_ci;
 
+create index idx_creatorUserId on task (creatorUserId);
