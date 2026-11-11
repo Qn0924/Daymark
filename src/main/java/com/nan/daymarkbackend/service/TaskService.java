@@ -49,6 +49,15 @@ public interface TaskService extends IService<Task> {
      */
     Page<Task> listMyTask(TaskQueryRequest taskQueryRequest, User loginUser);
 
+    /**
+     * 展示任务
+     * @param taskQueryRequest
+     * @param loginUser
+     * @return
+     */
+    Page<Task> listTaskByPage(TaskQueryRequest taskQueryRequest,User loginUser);
+
+
 
 
 }

@@ -100,4 +100,17 @@ public class TaskController {
         return ResultUtils.success(taskService.listMyTask(taskQueryRequest, loginUser));
     }
 
+    /**
+     * 展示任务接口
+     * @param taskQueryRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/list/page")
+    public BaseResponse<Page<Task>> listTaskByPage(@RequestBody TaskQueryRequest taskQueryRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(taskQueryRequest==null,ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(taskService.listTaskByPage(taskQueryRequest,loginUser));
+    }
+
 }

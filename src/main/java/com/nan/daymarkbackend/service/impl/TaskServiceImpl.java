@@ -283,6 +283,31 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         queryWrapper.orderByDesc("taskCreateTime");
         return this.page(new Page<>(current, pageSize), queryWrapper);
     }
+
+    /**
+     * 展示任务
+     * @param taskQueryRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Page<Task> listTaskByPage(TaskQueryRequest taskQueryRequest,User loginUser) {
+        ThrowUtils.throwIf(taskQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null,ErrorCode.NOT_LOGIN_ERROR);
+
+        long current = taskQueryRequest.getCurrent();
+        long pageSize = taskQueryRequest.getPageSize();
+        ThrowUtils.throwIf(current <= 0 || pageSize <= 0, ErrorCode.PARAMS_ERROR, "分页参数不合法");
+
+        String taskName = StrUtil.trim(taskQueryRequest.getTaskName());
+        QueryWrapper<Task> queryWrapper = new QueryWrapper<Task>()
+                .isNull("userId")
+                .eq("taskStatus", TaskStatusEnum.OPEN.getValue())
+                .like(StrUtil.isNotBlank(taskName), "taskName", taskName)
+                .orderByDesc("taskCreateTime");
+
+        return this.page(new Page<>(current, pageSize), queryWrapper);
+    }
 }
 
 
