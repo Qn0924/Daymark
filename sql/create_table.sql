@@ -145,3 +145,9 @@ create table if not exists team_member
     ) comment '团队成员' collate = utf8mb4_unicode_ci;
 
 create index idx_creatorUserId on task (creatorUserId);
+
+ALTER TABLE studytime
+    ADD COLUMN runningUserId bigint GENERATED ALWAYS AS
+        (IF(status = 'running' AND isDelete = 0, userId, NULL)) VIRTUAL
+    COMMENT '进行中用户id，仅用于唯一约束',
+  ADD UNIQUE KEY uk_running_user (runningUserId);

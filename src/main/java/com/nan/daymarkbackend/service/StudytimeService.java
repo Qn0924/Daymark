@@ -2,6 +2,8 @@ package com.nan.daymarkbackend.service;
 
 import com.nan.daymarkbackend.model.entity.Studytime;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.nan.daymarkbackend.model.entity.User;
+import com.nan.daymarkbackend.model.vo.StudyTimeVO;
 
 /**
 * @author 21289
@@ -10,4 +12,12 @@ import com.baomidou.mybatisplus.extension.service.IService;
 */
 public interface StudytimeService extends IService<Studytime> {
 
+    /**
+     * 开始计时
+     *
+     * @param taskId
+     * @param loginUser
+     * @return
+     */
+    StudyTimeVO startStudy(Long taskId, User loginUser);
 }

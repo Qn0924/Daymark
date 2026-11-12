@@ -43,30 +43,5 @@ public class StudyTimeVO implements Serializable {
      */
     private String status;
 
-    /**
-     * 服务端计算的已学习秒数
-     */
-    private Long studyedSeconds;
-
-    /**
-     * 有效分钟数，封顶 480
-     */
-    private Integer effectiveMinutes;
-
-    /**
-     * 是否已超过单次 8 小时上限
-     * */
-    private Boolean capped;
-
-    /**
-     * 是否已满足任务要求时长
-     */
-    private Boolean reachRequire;
-
-    /**
-     * 服务端当前时间，前端用于校正
-     */
-    private Date serverTime;
-
     private static final long serialVersionUID = 1L;
 }

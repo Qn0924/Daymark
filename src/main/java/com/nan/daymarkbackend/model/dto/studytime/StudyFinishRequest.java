@@ -10,11 +10,12 @@ import java.io.Serializable;
 @Data
 public class StudyFinishRequest implements Serializable {
 
-    /** 计时记录id */
+    /*
+    * 计时记录id
+    */
     private Long studyTimeId;
 
-    /** 结束方式：end 正常结束 / abandon 放弃 */
-    private String action;
+
 
     private static final long serialVersionUID = 1L;
 }
