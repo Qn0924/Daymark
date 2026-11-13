@@ -54,5 +54,15 @@ public class StudytimeController {
         return ResultUtils.success(studytimeService.endStudy(studyTimeId, loginUser));
     }
 
+    /**
+     * 计时心跳
+     */
+    @PostMapping("/heartbeat")
+    public BaseResponse<StudyTimeVO> heartbeat(Long studyTimeId, HttpServletRequest httpRequest) {
+        ThrowUtils.throwIf(studyTimeId == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(studytimeService.heartbeat(studyTimeId, loginUser));
+    }
+
 
 }

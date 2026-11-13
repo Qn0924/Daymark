@@ -28,4 +28,12 @@ public interface StudytimeService extends IService<Studytime> {
      */
     StudyTimeVO endStudy(Long studyTimeId, User loginUser);
 
+    /**
+     * 计时心跳
+     * @param studyTimeId
+     * @param loginUser
+     * @return
+     */
+    StudyTimeVO heartbeat(Long studyTimeId, User loginUser);
+
 }
