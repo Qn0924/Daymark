@@ -1,7 +1,6 @@
 package com.nan.daymarkbackend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
@@ -17,6 +16,7 @@ import com.nan.daymarkbackend.service.StudytimeService;
 import com.nan.daymarkbackend.mapper.StudytimeMapper;
 import com.nan.daymarkbackend.service.TaskService;
 import com.nan.daymarkbackend.service.TeamMemberService;
+import com.nan.daymarkbackend.service.UserService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +26,7 @@ import java.util.Date;
 /**
 * @author 21289
 * @description 针对表【studytime(学习计时)】的数据库操作Service实现
-* @createDate 2026-11-12 14:42:39
+* @createDate 2026-11-13 11:05:35
 */
 @Service
 public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime>
@@ -37,6 +37,9 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
 
     @Resource
     private TeamMemberService teamMemberService;
+
+    @Resource
+    private UserService userService;
 
     /**
      * 开始计时
@@ -50,6 +53,12 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
     public StudyTimeVO startStudy(Long taskId, User loginUser) {
         ThrowUtils.throwIf(taskId == null || taskId <= 0, ErrorCode.PARAMS_ERROR, "任务id不合法");
         ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        //同一个用户只能处理一个请求
+        userService.lambdaQuery()
+                .eq(User::getId, loginUser.getId())
+                .last("FOR UPDATE")
+                .one();
 
         //查找要打卡的任务是否正常
         Task task = getTaskDefinition(taskId);
@@ -70,13 +79,13 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
         ThrowUtils.throwIf(memberCount == null || memberCount <= 0, ErrorCode.NO_AUTH_ERROR, "你不是该打卡团成员，无法计时");
 
         //只能有一个计时
-        Studytime running = this.lambdaQuery()
+        Long runningCount = this.lambdaQuery()
                 .eq(Studytime::getUserId, loginUser.getId())
                 .eq(Studytime::getStatus, StudyTimeStatusEnum.RUNNING.getValue())
-                .one();
-        ThrowUtils.throwIf(running != null, ErrorCode.OPERATION_ERROR, "请先结束当前学习");
+                .count();
+        ThrowUtils.throwIf(runningCount != null && runningCount > 0, ErrorCode.OPERATION_ERROR, "请先结束当前学习");
 
-        // 4. 插入开始记录
+        // 插入开始记录
         Studytime studyTime = new Studytime();
         studyTime.setUserId(loginUser.getId());
         studyTime.setTaskId(taskId);
@@ -84,6 +93,38 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
         studyTime.setStartTime(new Date());
         studyTime.setStatus(StudyTimeStatusEnum.RUNNING.getValue());
         ThrowUtils.throwIf(!this.save(studyTime), ErrorCode.OPERATION_ERROR, "开始计时失败");
+
+        return toVO(studyTime);
+
+    }
+
+    /**
+     * 结束计时
+     * @param studyTimeId
+     * @param loginUser
+     * @return
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public StudyTimeVO endStudy(Long studyTimeId, User loginUser) {
+        ThrowUtils.throwIf(studyTimeId == null || studyTimeId <= 0, ErrorCode.PARAMS_ERROR, "计时id不合法");
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        //查要结束计时的任务
+        Studytime studyTime = this.getById(studyTimeId);
+        ThrowUtils.throwIf(studyTime == null, ErrorCode.NOT_FOUND_ERROR, "计时记录不存在");
+        ThrowUtils.throwIf(!studyTime.getUserId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权操作该计时");
+        ThrowUtils.throwIf(!StudyTimeStatusEnum.RUNNING.getValue().equals(studyTime.getStatus()), ErrorCode.OPERATION_ERROR, "计时已结束");
+
+        //计时持续时间
+        Date now = new Date();
+        long minutes = (now.getTime() - studyTime.getStartTime().getTime()) / 60000;
+
+        //插入
+        studyTime.setEndTime(now);
+        studyTime.setDuration((int) minutes);
+        studyTime.setStatus(StudyTimeStatusEnum.FINISHED.getValue());
+        ThrowUtils.throwIf(!this.updateById(studyTime), ErrorCode.OPERATION_ERROR, "结束计时失败");
 
         return toVO(studyTime);
 
@@ -99,6 +140,7 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
         return taskService.lambdaQuery()
                 .eq(Task::getTaskId, taskId)
                 .isNull(Task::getUserId)
+                .last("LIMIT 1")
                 .one();
     }
 
@@ -112,7 +154,6 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
         BeanUtil.copyProperties(studyTime,studyTimeVO);
         return studyTimeVO;
     }
-
 
 }
 

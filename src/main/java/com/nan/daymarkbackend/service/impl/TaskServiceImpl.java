@@ -72,7 +72,8 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         Date startDate = taskAddRequest.getStartDate();
         Date endDate = taskAddRequest.getEndDate();
         ThrowUtils.throwIf(startDate == null || endDate == null, ErrorCode.PARAMS_ERROR, "任务起止时间不能为空");
-        ThrowUtils.throwIf(endDate.before(startDate), ErrorCode.PARAMS_ERROR, "任务结束日期不能早于开始日期");
+        ThrowUtils.throwIf(!endDate.after(startDate), ErrorCode.PARAMS_ERROR, "任务结束日期必须晚于开始日期");
+
         Date tomorrowStart = DateUtil.beginOfDay(DateUtil.tomorrow());
         ThrowUtils.throwIf(endDate.before(tomorrowStart), ErrorCode.PARAMS_ERROR, "任务结束日期不满足要求，无法通过审核");
 
@@ -220,8 +221,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
                 ErrorCode.OPERATION_ERROR, "当前状态不允许修改任务信息");
 
         Date endDate = taskResubmitRequest.getEndDate();
-        ThrowUtils.throwIf(task.getStartDate() != null && endDate.before(task.getStartDate()),
-                ErrorCode.PARAMS_ERROR, "结束日期不能早于开始日期");
+        ThrowUtils.throwIf(task.getStartDate() != null && !endDate.after(task.getStartDate()), ErrorCode.PARAMS_ERROR, "结束日期不能早于开始日期");
 
         //回到待审核
         boolean taskResult = this.lambdaUpdate()
