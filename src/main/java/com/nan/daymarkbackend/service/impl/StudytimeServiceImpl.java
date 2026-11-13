@@ -120,6 +120,14 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
         Studytime studyTime = this.getById(studyTimeId);
         ThrowUtils.throwIf(studyTime == null, ErrorCode.NOT_FOUND_ERROR, "计时记录不存在");
         ThrowUtils.throwIf(!studyTime.getUserId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权操作该计时");
+
+
+        // 心跳中断超2分钟的先自动结算，按最后一次心跳截断时长
+        studyTime = autoCloseIfTimeout(studyTime);
+        if (!StudyTimeStatusEnum.RUNNING.getValue().equals(studyTime.getStatus())) {
+            return toVO(studyTime);
+        }
+
         ThrowUtils.throwIf(!StudyTimeStatusEnum.RUNNING.getValue().equals(studyTime.getStatus()), ErrorCode.OPERATION_ERROR, "计时已结束");
 
         //计时持续时间
@@ -156,7 +164,9 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
 
         // 中断超过 2 分钟的，先自动结算
         studyTime = autoCloseIfTimeout(studyTime);
-        ThrowUtils.throwIf(!StudyTimeStatusEnum.RUNNING.getValue().equals(studyTime.getStatus()), ErrorCode.OPERATION_ERROR, "计时已结束");
+        if (!StudyTimeStatusEnum.RUNNING.getValue().equals(studyTime.getStatus())) {
+            return toVO(studyTime);   // 已自动结算，直接把结束态返回给前端
+        }
 
         Date now = new Date();
         boolean updated = this.lambdaUpdate()
@@ -195,13 +205,14 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
         //心跳断了，浏览器已关闭，按最后一次心跳结束
         if (now.getTime() - lastHeartbeat.getTime() > StudytimeConstant.HEARTBEAT_TIMEOUT_MILLIS) {
             long minutes = (lastHeartbeat.getTime() - start.getTime())/ 60000;
-            this.lambdaUpdate()
+            boolean update = this.lambdaUpdate()
                     .eq(Studytime::getId, studyTime.getId())
                     .eq(Studytime::getStatus, StudyTimeStatusEnum.RUNNING.getValue())
                     .set(Studytime::getEndTime, lastHeartbeat)
                     .set(Studytime::getDuration, (int) minutes)
                     .set(Studytime::getStatus, StudyTimeStatusEnum.FINISHED.getValue())
                     .update();
+            //ThrowUtils.throwIf(!update,ErrorCode.OPERATION_ERROR,"数据库操作失败");
             return this.getById(studyTime.getId());
         }
 
