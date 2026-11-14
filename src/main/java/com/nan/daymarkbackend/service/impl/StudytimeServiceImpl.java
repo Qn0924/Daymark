@@ -1,6 +1,7 @@
 package com.nan.daymarkbackend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nan.daymarkbackend.constant.StudytimeConstant;
 import com.nan.daymarkbackend.exception.ErrorCode;
@@ -68,9 +69,9 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
         ThrowUtils.throwIf(!TaskStatusEnum.OPEN.getValue().equals(task.getTaskStatus()), ErrorCode.OPERATION_ERROR, "任务未开放，无法开始计时");
 
         //今天必须在任务起止日期内
-        Date todayDate = new Date();
-        ThrowUtils.throwIf(task.getStartDate() != null && todayDate.before(task.getStartDate()), ErrorCode.OPERATION_ERROR, "任务还未开始");
-        ThrowUtils.throwIf(task.getEndDate() != null && todayDate.after(task.getEndDate()), ErrorCode.OPERATION_ERROR, "任务已结束");
+        Date today = DateUtil.beginOfDay(new Date());
+        ThrowUtils.throwIf(task.getStartDate() != null && today.before(DateUtil.beginOfDay(task.getStartDate())), ErrorCode.OPERATION_ERROR, "任务还未开始");
+        ThrowUtils.throwIf(task.getEndDate() != null && today.after(DateUtil.beginOfDay(task.getEndDate())), ErrorCode.OPERATION_ERROR, "任务已结束");
 
         //是否是该团队成员
         Long memberCount = teamMemberService.lambdaQuery()
