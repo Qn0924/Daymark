@@ -5,6 +5,10 @@ server:
 spring:
   application:
     name: daymark-backend
+  servlet:
+    multipart:
+      max-file-size: 10MB      # 单个文件最大限制
+      max-request-size: 20MB   # 单次请求总大小限制（多文件上传时用）
   # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
