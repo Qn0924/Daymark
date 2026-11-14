@@ -352,7 +352,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         ThrowUtils.throwIf(userPasswordUpdateRequest == null, ErrorCode.PARAMS_ERROR);
         //校验要修改密码的用户是否存在
         Long userId = userPasswordUpdateRequest.getId();
-        ThrowUtils.throwIf(userId<0,ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
         if(!isAdmin(loginUser)&& !loginUser.getId().equals(userId)){
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
