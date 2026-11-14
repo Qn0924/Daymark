@@ -53,7 +53,7 @@ create table if not exists task
     INDEX idx_teamId        (teamId),
     INDEX idx_userId_date   (userId, checkinDate),
     INDEX idx_team_status   (teamId, taskStatus)
-    ) comment '任务与打卡合并宽表' collate = utf8mb4_unicode_ci;
+    ) comment '任务表' collate = utf8mb4_unicode_ci;
 
 -- 学习计时表
 create table if not exists studytime

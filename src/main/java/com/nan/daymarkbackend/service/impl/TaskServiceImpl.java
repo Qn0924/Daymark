@@ -1,5 +1,6 @@
 package com.nan.daymarkbackend.service.impl;
 
+import cn.hutool.core.date.DateTime;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -10,25 +11,19 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
-import com.nan.daymarkbackend.model.dto.task.TaskAddRequest;
-import com.nan.daymarkbackend.model.dto.task.TaskAuditRequest;
-import com.nan.daymarkbackend.model.dto.task.TaskQueryRequest;
-import com.nan.daymarkbackend.model.dto.task.TaskResubmitRequest;
-import com.nan.daymarkbackend.model.entity.Task;
-import com.nan.daymarkbackend.model.entity.Team;
-import com.nan.daymarkbackend.model.entity.TeamMember;
-import com.nan.daymarkbackend.model.entity.User;
+import com.nan.daymarkbackend.model.dto.task.*;
+import com.nan.daymarkbackend.model.entity.*;
 import com.nan.daymarkbackend.model.enums.*;
-import com.nan.daymarkbackend.service.TaskService;
+import com.nan.daymarkbackend.service.*;
 import com.nan.daymarkbackend.mapper.TaskMapper;
-import com.nan.daymarkbackend.service.TeamMemberService;
-import com.nan.daymarkbackend.service.TeamService;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 /**
 * @author 21289
@@ -44,6 +39,15 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
 
     @Resource
     private TeamMemberService teamMemberService;
+
+    @Resource
+    private StudytimeService studytimeService;
+
+    @Resource
+    private UserService userService;
+
+    @Resource
+    private PointRecordService pointRecordService;
 
     /**
      * 添加任务
@@ -308,6 +312,158 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
 
         return this.page(new Page<>(current, pageSize), queryWrapper);
     }
+
+    /**
+     * 正常打卡
+     * @param taskCheckinRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long checkin(TaskCheckinRequest taskCheckinRequest, User loginUser) {
+        checkRequest(taskCheckinRequest, loginUser);
+        return doCheckin(taskCheckinRequest, loginUser, "normal");
+    }
+
+    /**
+     * 补卡
+     * @param taskCheckinRequest
+     * @param loginUser
+     * @return
+     */
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public Long makeup(TaskCheckinRequest taskCheckinRequest, User loginUser) {
+        checkRequest(taskCheckinRequest, loginUser);
+        return doCheckin(taskCheckinRequest, loginUser, "repair");
+    }
+
+    /**
+     * 打卡补卡请求校验
+     * @param taskCheckinRequest
+     * @param loginUser
+     */
+    private void checkRequest(TaskCheckinRequest taskCheckinRequest, User loginUser) {
+        ThrowUtils.throwIf(taskCheckinRequest == null, ErrorCode.PARAMS_ERROR, "请求数据为空");
+        ThrowUtils.throwIf(loginUser == null , ErrorCode.NOT_LOGIN_ERROR);
+        ThrowUtils.throwIf(taskCheckinRequest.getTaskId() == null || taskCheckinRequest.getTaskId() <= 0, ErrorCode.PARAMS_ERROR, "任务id不合法");
+    }
+
+    /**
+     * 校验打卡补卡是否能成功
+     * @param taskCheckinRequest
+     * @param loginUser
+     * @param recordStatus
+     * @return
+     */
+    //todo 设置积分
+    private Long doCheckin(TaskCheckinRequest taskCheckinRequest, User loginUser, String recordStatus) {
+        Long taskId = taskCheckinRequest.getTaskId();
+        String photoUrl = taskCheckinRequest.getPhotoUrl();
+
+        //任务定义行必须存在且开放
+        Task task = this.lambdaQuery()
+                .eq(Task::getTaskId, taskId)
+                .isNull(Task::getUserId)
+                .one();
+        ThrowUtils.throwIf(task == null, ErrorCode.NOT_FOUND_ERROR, "任务不存在");
+        ThrowUtils.throwIf(!TaskStatusEnum.OPEN.getValue().equals(task.getTaskStatus()), ErrorCode.OPERATION_ERROR, "任务未开放，无法打卡");
+
+        //打卡日期今天，必须在任务有效期内
+        Date now = new Date();
+        DateTime today = DateUtil.beginOfDay(now);
+        ThrowUtils.throwIf(task.getStartDate() != null && now.before(task.getStartDate()), ErrorCode.OPERATION_ERROR, "任务尚未开始，无法打卡");
+        ThrowUtils.throwIf(task.getEndDate() != null && !now.before(task.getEndDate()), ErrorCode.OPERATION_ERROR, "任务已结束，无法打卡");
+
+        //必须是该打卡团的有效成员
+        Long memberCount = teamMemberService.lambdaQuery()
+                .eq(TeamMember::getTeamId, task.getTeamId())
+                .eq(TeamMember::getUserId, loginUser.getId())
+                .eq(TeamMember::getStatus, TeamMemberStatusEnum.ACTIVE.getValue())
+                .in(TeamMember::getRole,
+                        TeamMemberRoleEnum.OWNER.getValue(),
+                        TeamMemberRoleEnum.WORKER.getValue())
+                .count();
+        ThrowUtils.throwIf(memberCount == null || memberCount <= 0, ErrorCode.NO_AUTH_ERROR, "你不是该打卡团成员");
+
+        //今天不能重复打卡
+        Long existCount = this.lambdaQuery()
+                .eq(Task::getTaskId, taskId)
+                .eq(Task::getUserId, loginUser.getId())
+                .eq(Task::getCheckinDate, today)
+                .count();
+        ThrowUtils.throwIf(existCount != null && existCount > 0, ErrorCode.OPERATION_ERROR, "今天已打卡，不能重复打卡");
+
+        //还有正在进行的计时先去结束
+        Long runningCount = studytimeService.lambdaQuery()
+                .eq(Studytime::getUserId, loginUser.getId())
+                .eq(Studytime::getTaskId, taskId)
+                .eq(Studytime::getStatus, StudyTimeStatusEnum.RUNNING.getValue())
+                .count();
+        ThrowUtils.throwIf(runningCount != null && runningCount > 0, ErrorCode.OPERATION_ERROR, "请先关闭当前计时再打卡");
+
+        //统计今天这个任务的已完成时长同一天多次学习相加
+        List<Studytime> todayTimeList = studytimeService.lambdaQuery()
+                .eq(Studytime::getUserId, loginUser.getId())
+                .eq(Studytime::getTaskId, taskId)
+                .eq(Studytime::getStatus, StudyTimeStatusEnum.FINISHED.getValue())
+                .between(Studytime::getStartTime, DateUtil.beginOfDay(now), DateUtil.endOfDay(now))
+                .list();
+        ThrowUtils.throwIf(todayTimeList.isEmpty(), ErrorCode.OPERATION_ERROR, "今天还没有完成的学习计时，无法打卡");
+
+        int totalMinutes = todayTimeList
+                .stream()
+                .mapToInt(Studytime::getDuration)
+                .sum();
+        ThrowUtils.throwIf(totalMinutes < task.getRequireDuration(), ErrorCode.OPERATION_ERROR, "学习时长不足，无法打卡");
+
+        //任务要求照片时必传，不要求可以不传
+        if (task.getRequirePhoto() != null && task.getRequirePhoto() == 1) {
+            ThrowUtils.throwIf(StrUtil.isBlank(photoUrl), ErrorCode.PARAMS_ERROR, "该任务打卡需要上传照片");
+        }
+
+        //插入打卡记录
+        Task record = new Task();
+        record.setTaskId(task.getTaskId());
+        record.setTeamId(task.getTeamId());
+        record.setCreatorUserId(task.getCreatorUserId());
+        record.setTaskName(task.getTaskName());
+        record.setTaskCategory(task.getTaskCategory());
+        record.setDescription(task.getDescription());
+        record.setRequireDuration(task.getRequireDuration());
+        record.setRequirePhoto(task.getRequirePhoto());
+        record.setStartDate(task.getStartDate());
+        record.setEndDate(task.getEndDate());
+        record.setTaskStatus(task.getTaskStatus());
+        record.setTaskCreateTime(task.getTaskCreateTime());
+
+        record.setUserId(loginUser.getId());
+        record.setCheckinDate(today);
+        record.setCheckinTime(new Date());
+        record.setDuration(totalMinutes);
+        record.setPhotoUrl(StrUtil.isBlank(photoUrl) ? null : photoUrl);
+        record.setRecordStatus(recordStatus);
+        record.setPoints(0);
+
+        ThrowUtils.throwIf(!this.save(record), ErrorCode.OPERATION_ERROR, "打卡失败");
+
+        // ===== 积分结算 =====
+        int change;
+        if ("normal".equals(recordStatus)) {
+            //正常打卡
+            change = pointRecordService.normalGivePoints(loginUser, record.getId());
+        } else {
+            //补卡
+            change = pointRecordService.makeupPoints(loginUser, record.getId());
+        }
+        // 把本次积分变动写回打卡记录
+        record.setPoints(change);
+        boolean result = this.updateById(record);
+        ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"数据库操作失败");
+        return record.getId();
+    }
+
 }
 
 

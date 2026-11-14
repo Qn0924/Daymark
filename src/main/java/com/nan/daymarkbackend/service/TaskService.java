@@ -1,13 +1,12 @@
 package com.nan.daymarkbackend.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.nan.daymarkbackend.model.dto.task.TaskAddRequest;
-import com.nan.daymarkbackend.model.dto.task.TaskAuditRequest;
-import com.nan.daymarkbackend.model.dto.task.TaskQueryRequest;
-import com.nan.daymarkbackend.model.dto.task.TaskResubmitRequest;
+import com.nan.daymarkbackend.model.dto.task.*;
 import com.nan.daymarkbackend.model.entity.Task;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.nan.daymarkbackend.model.entity.User;
+
+import java.util.Date;
 
 /**
 * @author 21289
@@ -57,7 +56,15 @@ public interface TaskService extends IService<Task> {
      */
     Page<Task> listTaskByPage(TaskQueryRequest taskQueryRequest,User loginUser);
 
+    /**
+     * 正常打卡
+     */
+    Long checkin(TaskCheckinRequest request, User loginUser);
 
+    /**
+     * 补卡
+     */
+    Long makeup(TaskCheckinRequest request, User loginUser);
 
 
 }

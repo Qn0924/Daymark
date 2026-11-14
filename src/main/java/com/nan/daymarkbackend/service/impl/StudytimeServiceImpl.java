@@ -11,6 +11,7 @@ import com.nan.daymarkbackend.model.entity.TeamMember;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.enums.StudyTimeStatusEnum;
 import com.nan.daymarkbackend.model.enums.TaskStatusEnum;
+import com.nan.daymarkbackend.model.enums.TeamMemberRoleEnum;
 import com.nan.daymarkbackend.model.enums.TeamMemberStatusEnum;
 import com.nan.daymarkbackend.model.vo.StudyTimeVO;
 import com.nan.daymarkbackend.service.StudytimeService;
@@ -76,6 +77,9 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
                 .eq(TeamMember::getTeamId, task.getTeamId())
                 .eq(TeamMember::getUserId, loginUser.getId())
                 .eq(TeamMember::getStatus, TeamMemberStatusEnum.ACTIVE.getValue())
+                .in(TeamMember::getRole,
+                        TeamMemberRoleEnum.OWNER.getValue(),
+                        TeamMemberRoleEnum.WORKER.getValue())
                 .count();
         ThrowUtils.throwIf(memberCount == null || memberCount <= 0, ErrorCode.NO_AUTH_ERROR, "你不是该打卡团成员，无法计时");
 
