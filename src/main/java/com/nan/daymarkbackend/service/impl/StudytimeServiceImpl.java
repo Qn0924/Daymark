@@ -141,8 +141,8 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
 
         //插入
         this.lambdaUpdate()
-                .eq(Studytime::getId, studyTimeId)                                  // WHERE id = ?
-                .eq(Studytime::getStatus, StudyTimeStatusEnum.RUNNING.getValue())   // AND status = 'running'
+                .eq(Studytime::getId, studyTimeId)
+                .eq(Studytime::getStatus, StudyTimeStatusEnum.RUNNING.getValue())
                 .set(Studytime::getEndTime, now)
                 .set(Studytime::getDuration, (int) minutes)
                 .set(Studytime::getStatus, StudyTimeStatusEnum.FINISHED.getValue())
