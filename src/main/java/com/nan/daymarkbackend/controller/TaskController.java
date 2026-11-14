@@ -9,10 +9,7 @@ import com.nan.daymarkbackend.common.ResultUtils;
 import com.nan.daymarkbackend.constant.UserConstant;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
-import com.nan.daymarkbackend.model.dto.task.TaskAddRequest;
-import com.nan.daymarkbackend.model.dto.task.TaskAuditRequest;
-import com.nan.daymarkbackend.model.dto.task.TaskQueryRequest;
-import com.nan.daymarkbackend.model.dto.task.TaskResubmitRequest;
+import com.nan.daymarkbackend.model.dto.task.*;
 import com.nan.daymarkbackend.model.entity.Task;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.enums.TaskStatusEnum;
@@ -111,6 +108,30 @@ public class TaskController {
         ThrowUtils.throwIf(taskQueryRequest==null,ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(request);
         return ResultUtils.success(taskService.listTaskByPage(taskQueryRequest,loginUser));
+    }
+
+    /**
+     * 正常打卡
+     * @param taskCheckinRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/checkin")
+    public BaseResponse<Long> checkin(@RequestBody TaskCheckinRequest taskCheckinRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(taskCheckinRequest == null, ErrorCode.PARAMS_ERROR);
+        return ResultUtils.success(taskService.checkin(taskCheckinRequest, userService.getLoginUser(request)));
+    }
+
+    /**
+     * 补卡
+     * @param taskCheckinRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/makeup")
+    public BaseResponse<Long> makeup(@RequestBody TaskCheckinRequest taskCheckinRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(taskCheckinRequest == null, ErrorCode.PARAMS_ERROR);
+        return ResultUtils.success(taskService.makeup(taskCheckinRequest, userService.getLoginUser(request)));
     }
 
 }

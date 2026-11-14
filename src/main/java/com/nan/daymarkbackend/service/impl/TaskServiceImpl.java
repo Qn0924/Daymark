@@ -357,7 +357,6 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
      * @param recordStatus
      * @return
      */
-    //todo 设置积分
     private Long doCheckin(TaskCheckinRequest taskCheckinRequest, User loginUser, String recordStatus) {
         Long taskId = taskCheckinRequest.getTaskId();
         String photoUrl = taskCheckinRequest.getPhotoUrl();
@@ -370,11 +369,25 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         ThrowUtils.throwIf(task == null, ErrorCode.NOT_FOUND_ERROR, "任务不存在");
         ThrowUtils.throwIf(!TaskStatusEnum.OPEN.getValue().equals(task.getTaskStatus()), ErrorCode.OPERATION_ERROR, "任务未开放，无法打卡");
 
-        //打卡日期今天，必须在任务有效期内
-        Date now = new Date();
-        DateTime today = DateUtil.beginOfDay(now);
-        ThrowUtils.throwIf(task.getStartDate() != null && now.before(task.getStartDate()), ErrorCode.OPERATION_ERROR, "任务尚未开始，无法打卡");
-        ThrowUtils.throwIf(task.getEndDate() != null && !now.before(task.getEndDate()), ErrorCode.OPERATION_ERROR, "任务已结束，无法打卡");
+        //打卡日期
+        Date checkinDate = taskCheckinRequest.getCheckinDate();
+        ThrowUtils.throwIf(checkinDate == null, ErrorCode.PARAMS_ERROR, "请选择打卡日期");
+        //统一截成日期
+        checkinDate = DateUtil.beginOfDay(checkinDate);
+
+        Date today = DateUtil.beginOfDay(new Date());
+        if ("repair".equals(recordStatus)) {
+            //补卡今天之前、7天以内
+            ThrowUtils.throwIf(!checkinDate.before(today), ErrorCode.PARAMS_ERROR, "只能补今天之前的卡");
+            ThrowUtils.throwIf(checkinDate.before(DateUtil.offsetDay(today, -7)), ErrorCode.PARAMS_ERROR, "只能补 7 天内的卡");
+        } else {
+            //正常打卡必须是今天
+            ThrowUtils.throwIf(!DateUtil.isSameDay(checkinDate, today), ErrorCode.PARAMS_ERROR, "正常打卡只能选今天");
+        }
+
+        //打卡日期必须在任务有效期内
+        ThrowUtils.throwIf(task.getStartDate() != null && checkinDate.before(DateUtil.beginOfDay(task.getStartDate())), ErrorCode.OPERATION_ERROR, "任务尚未开始，无法打卡");
+        ThrowUtils.throwIf(task.getEndDate() != null && checkinDate.after(DateUtil.beginOfDay(task.getEndDate())), ErrorCode.OPERATION_ERROR, "任务已结束，无法打卡");
 
         //必须是该打卡团的有效成员
         Long memberCount = teamMemberService.lambdaQuery()
@@ -387,11 +400,11 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
                 .count();
         ThrowUtils.throwIf(memberCount == null || memberCount <= 0, ErrorCode.NO_AUTH_ERROR, "你不是该打卡团成员");
 
-        //今天不能重复打卡
+        //不能重复打卡
         Long existCount = this.lambdaQuery()
                 .eq(Task::getTaskId, taskId)
                 .eq(Task::getUserId, loginUser.getId())
-                .eq(Task::getCheckinDate, today)
+                .eq(Task::getCheckinDate, checkinDate)
                 .count();
         ThrowUtils.throwIf(existCount != null && existCount > 0, ErrorCode.OPERATION_ERROR, "今天已打卡，不能重复打卡");
 
@@ -404,11 +417,12 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         ThrowUtils.throwIf(runningCount != null && runningCount > 0, ErrorCode.OPERATION_ERROR, "请先关闭当前计时再打卡");
 
         //统计今天这个任务的已完成时长同一天多次学习相加
+        Date nowTime = new Date();
         List<Studytime> todayTimeList = studytimeService.lambdaQuery()
                 .eq(Studytime::getUserId, loginUser.getId())
                 .eq(Studytime::getTaskId, taskId)
                 .eq(Studytime::getStatus, StudyTimeStatusEnum.FINISHED.getValue())
-                .between(Studytime::getStartTime, DateUtil.beginOfDay(now), DateUtil.endOfDay(now))
+                .between(Studytime::getStartTime, DateUtil.beginOfDay(nowTime), DateUtil.endOfDay(nowTime))
                 .list();
         ThrowUtils.throwIf(todayTimeList.isEmpty(), ErrorCode.OPERATION_ERROR, "今天还没有完成的学习计时，无法打卡");
 
@@ -439,7 +453,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         record.setTaskCreateTime(task.getTaskCreateTime());
 
         record.setUserId(loginUser.getId());
-        record.setCheckinDate(today);
+        record.setCheckinDate(checkinDate);
         record.setCheckinTime(new Date());
         record.setDuration(totalMinutes);
         record.setPhotoUrl(StrUtil.isBlank(photoUrl) ? null : photoUrl);
