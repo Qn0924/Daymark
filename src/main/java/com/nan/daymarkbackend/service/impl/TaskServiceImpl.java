@@ -16,6 +16,7 @@ import com.nan.daymarkbackend.model.entity.*;
 import com.nan.daymarkbackend.model.enums.*;
 import com.nan.daymarkbackend.service.*;
 import com.nan.daymarkbackend.mapper.TaskMapper;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
     @Resource
     private TeamMemberService teamMemberService;
 
+    @Lazy
     @Resource
     private StudytimeService studytimeService;
 
