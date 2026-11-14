@@ -140,12 +140,15 @@ public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime
         long minutes = (now.getTime() - studyTime.getStartTime().getTime()) / 60000;
 
         //插入
-        studyTime.setEndTime(now);
-        studyTime.setDuration((int)minutes);
-        studyTime.setStatus(StudyTimeStatusEnum.FINISHED.getValue());
-        ThrowUtils.throwIf(!this.updateById(studyTime), ErrorCode.OPERATION_ERROR, "结束计时失败");
+        this.lambdaUpdate()
+                .eq(Studytime::getId, studyTimeId)                                  // WHERE id = ?
+                .eq(Studytime::getStatus, StudyTimeStatusEnum.RUNNING.getValue())   // AND status = 'running'
+                .set(Studytime::getEndTime, now)
+                .set(Studytime::getDuration, (int) minutes)
+                .set(Studytime::getStatus, StudyTimeStatusEnum.FINISHED.getValue())
+                .update();
 
-        return toVO(studyTime);
+        return toVO(this.getById(studyTimeId));
 
     }
 

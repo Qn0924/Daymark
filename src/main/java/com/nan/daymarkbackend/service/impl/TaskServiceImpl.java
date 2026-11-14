@@ -468,7 +468,11 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         record.setRecordStatus(recordStatus);
         record.setPoints(0);
 
-        ThrowUtils.throwIf(!this.save(record), ErrorCode.OPERATION_ERROR, "打卡失败");
+        try {
+            ThrowUtils.throwIf(!this.save(record), ErrorCode.OPERATION_ERROR, "打卡失败");
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "今天已打卡，不能重复打卡");
+        }
 
         // 积分结算
         int change;
