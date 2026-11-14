@@ -361,6 +361,14 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         Long taskId = taskCheckinRequest.getTaskId();
         String photoUrl = taskCheckinRequest.getPhotoUrl();
 
+        // 同一用户的打卡
+        User dbUser = userService.lambdaQuery()
+                .eq(User::getId, loginUser.getId())
+                .last("FOR UPDATE")
+                .one();
+        ThrowUtils.throwIf(dbUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+
         //任务定义行必须存在且开放
         Task task = this.lambdaQuery()
                 .eq(Task::getTaskId, taskId)
@@ -462,14 +470,14 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
 
         ThrowUtils.throwIf(!this.save(record), ErrorCode.OPERATION_ERROR, "打卡失败");
 
-        // ===== 积分结算 =====
+        // 积分结算
         int change;
         if ("normal".equals(recordStatus)) {
             //正常打卡
-            change = pointRecordService.normalGivePoints(loginUser, record.getId());
+            change = pointRecordService.normalGivePoints(dbUser, record.getId());
         } else {
             //补卡
-            change = pointRecordService.makeupPoints(loginUser, record.getId());
+            change = pointRecordService.makeupPoints(dbUser, record.getId());
         }
         // 把本次积分变动写回打卡记录
         record.setPoints(change);
