@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 @RestController
 @RequestMapping("/task")
@@ -132,6 +133,19 @@ public class TaskController {
     public BaseResponse<Long> makeup(@RequestBody TaskCheckinRequest taskCheckinRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(taskCheckinRequest == null, ErrorCode.PARAMS_ERROR);
         return ResultUtils.success(taskService.makeup(taskCheckinRequest, userService.getLoginUser(request)));
+    }
+
+    /**
+     * 打卡日历
+     * @param taskCheckinCalendarRequest
+     * @param httpServletRequest
+     * @return
+     */
+    @PostMapping("/checkin/calendar")
+    public BaseResponse<List<Task>> checkinCalendar(@RequestBody TaskCheckinCalendarRequest taskCheckinCalendarRequest, HttpServletRequest httpServletRequest) {
+        ThrowUtils.throwIf(taskCheckinCalendarRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpServletRequest);
+        return ResultUtils.success(taskService.listCheckinCalendar(taskCheckinCalendarRequest, loginUser));
     }
 
 }

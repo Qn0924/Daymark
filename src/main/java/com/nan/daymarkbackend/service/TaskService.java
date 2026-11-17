@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.nan.daymarkbackend.model.entity.User;
 
 import java.util.Date;
+import java.util.List;
 
 /**
 * @author 21289
@@ -65,6 +66,15 @@ public interface TaskService extends IService<Task> {
      * 补卡
      */
     Long makeup(TaskCheckinRequest request, User loginUser);
+
+    /**
+     * 查询当前用户指定日期范围内的打卡记录
+     *
+     * @param taskCheckinCalendarRequest
+     * @param loginUser
+     * @return 打卡记录列表，按打卡日期升序
+     */
+    List<Task> listCheckinCalendar(TaskCheckinCalendarRequest taskCheckinCalendarRequest, User loginUser);
 
 
 }

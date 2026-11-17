@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -339,6 +340,33 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
     public Long makeup(TaskCheckinRequest taskCheckinRequest, User loginUser) {
         checkRequest(taskCheckinRequest, loginUser);
         return doCheckin(taskCheckinRequest, loginUser, "repair");
+    }
+
+    /**
+     * 查询当前用户指定日期范围内的打卡记录给日历用
+     * @param taskCheckinCalendarRequest   日期范围
+     * @param loginUser 当前登录用户
+     * @return
+     */
+    @Override
+    public List<Task> listCheckinCalendar(TaskCheckinCalendarRequest taskCheckinCalendarRequest, User loginUser) {
+        ThrowUtils.throwIf(taskCheckinCalendarRequest == null || taskCheckinCalendarRequest.getStartDate() == null || taskCheckinCalendarRequest.getEndDate() == null, ErrorCode.PARAMS_ERROR, "请选择日期范围");
+        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        Date startDate = DateUtil.beginOfDay(taskCheckinCalendarRequest.getStartDate());
+        Date endDate = DateUtil.endOfDay(taskCheckinCalendarRequest.getEndDate());
+        ThrowUtils.throwIf(startDate.after(endDate), ErrorCode.PARAMS_ERROR, "日期范围不合法");
+        // 日历网格最多 6 周，限制范围，避免一次拉全表
+        ThrowUtils.throwIf(DateUtil.betweenDay(startDate, endDate, true) > 62, ErrorCode.PARAMS_ERROR, "日期范围不能超过 62 天");
+
+        return this.lambdaQuery()
+                // userId 只取登录态，禁止前端指定
+                .eq(Task::getUserId, loginUser.getId())
+                // userId 非空的行就是打卡记录行
+                .between(Task::getCheckinDate, startDate, endDate)
+                .orderByAsc(Task::getCheckinDate)
+                .orderByAsc(Task::getCheckinTime)
+                .list();
     }
 
     /**
