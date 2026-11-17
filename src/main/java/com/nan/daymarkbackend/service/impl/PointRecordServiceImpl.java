@@ -1,9 +1,14 @@
 package com.nan.daymarkbackend.service.impl;
 
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
+import com.nan.daymarkbackend.exception.ThrowUtils;
+import com.nan.daymarkbackend.model.dto.point.PointRecordQueryRequest;
 import com.nan.daymarkbackend.model.entity.PointRecord;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.service.PointRecordService;
@@ -108,6 +113,58 @@ public class PointRecordServiceImpl extends ServiceImpl<PointRecordMapper, Point
         userService.updateById(user);
         addRecord(user.getId(), recordId, -20, "makeup", "补打卡消耗");
         return -20;
+    }
+
+    /**
+     * 分页查询我的积分流水
+     *
+     * @param pointRecordQueryRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Page<PointRecord> listMyPointRecord(PointRecordQueryRequest pointRecordQueryRequest, User loginUser) {
+        ThrowUtils.throwIf(pointRecordQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        long current = pointRecordQueryRequest.getCurrent();
+        long pageSize = pointRecordQueryRequest.getPageSize();
+        ThrowUtils.throwIf(current <= 0 || pageSize <= 0 || pageSize > 50, ErrorCode.PARAMS_ERROR, "分页参数不合法");
+
+        LambdaQueryWrapper<PointRecord> queryWrapper = new LambdaQueryWrapper<PointRecord>()
+                // 关键：user 一律取登录态，绝不能用前端传的 userId
+                .eq(PointRecord::getUserId, loginUser.getId())
+                .eq(pointRecordQueryRequest.getRecordId() != null, PointRecord::getRecordId, pointRecordQueryRequest.getRecordId())
+                .eq(StrUtil.isNotBlank(pointRecordQueryRequest.getSource()), PointRecord::getSource, pointRecordQueryRequest.getSource())
+                .ge(pointRecordQueryRequest.getStartTime() != null, PointRecord::getCreateTime, pointRecordQueryRequest.getStartTime())
+                .le(pointRecordQueryRequest.getEndTime() != null, PointRecord::getCreateTime, pointRecordQueryRequest.getEndTime())
+                .orderByDesc(PointRecord::getCreateTime)
+                .orderByDesc(PointRecord::getId);
+        return this.page(new Page<>(current, pageSize), queryWrapper);
+
+    }
+
+    /**
+     * 查询所有积分流水
+     * @param pointRecordQueryRequest
+     * @return
+     */
+    @Override
+    public Page<PointRecord> listPointRecordByPage(PointRecordQueryRequest pointRecordQueryRequest) {
+        ThrowUtils.throwIf(pointRecordQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        long current = pointRecordQueryRequest.getCurrent();
+        long pageSize = pointRecordQueryRequest.getPageSize();
+        ThrowUtils.throwIf(current <= 0 || pageSize <= 0 || pageSize > 50, ErrorCode.PARAMS_ERROR, "分页参数不合法");
+
+        LambdaQueryWrapper<PointRecord> wrapper = new LambdaQueryWrapper<PointRecord>()
+                .eq(pointRecordQueryRequest.getUserId() != null, PointRecord::getUserId, pointRecordQueryRequest.getUserId())
+                .eq(pointRecordQueryRequest.getRecordId() != null, PointRecord::getRecordId, pointRecordQueryRequest.getRecordId())
+                .eq(StrUtil.isNotBlank(pointRecordQueryRequest.getSource()), PointRecord::getSource, pointRecordQueryRequest.getSource())
+                .ge(pointRecordQueryRequest.getStartTime() != null, PointRecord::getCreateTime, pointRecordQueryRequest.getStartTime())
+                .le(pointRecordQueryRequest.getEndTime() != null, PointRecord::getCreateTime, pointRecordQueryRequest.getEndTime())
+                .orderByDesc(PointRecord::getCreateTime)
+                .orderByDesc(PointRecord::getId);
+        return this.page(new Page<>(current, pageSize), wrapper);
     }
 
     /**

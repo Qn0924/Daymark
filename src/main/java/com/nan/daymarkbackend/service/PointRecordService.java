@@ -1,5 +1,7 @@
 package com.nan.daymarkbackend.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nan.daymarkbackend.model.dto.point.PointRecordQueryRequest;
 import com.nan.daymarkbackend.model.entity.PointRecord;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.nan.daymarkbackend.model.entity.User;
@@ -26,4 +28,19 @@ public interface PointRecordService extends IService<PointRecord> {
      * @return
      */
     int makeupPoints(User user, Long recordId);
+
+    /**
+     * 分页查询我的积分流水
+     * @param pointRecordQueryRequest
+     * @param loginUser
+     * @return
+     */
+    Page<PointRecord> listMyPointRecord(PointRecordQueryRequest pointRecordQueryRequest, User loginUser);
+
+    /**
+     * 分页查询所有积分流水
+     * @param pointRecordQueryRequest
+     * @return
+     */
+    Page<PointRecord> listPointRecordByPage(PointRecordQueryRequest pointRecordQueryRequest);
 }
