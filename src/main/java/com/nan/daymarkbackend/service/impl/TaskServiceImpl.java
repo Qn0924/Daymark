@@ -275,6 +275,8 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         long pageSize = taskQueryRequest.getPageSize();
         ThrowUtils.throwIf(current <= 0 || pageSize <= 0, ErrorCode.PARAMS_ERROR, "分页参数不合法");
 
+        closeExpiredTasks();
+
         QueryWrapper<Task> queryWrapper = new QueryWrapper<Task>()
                 .eq("creatorUserId", loginUser.getId())
                 .isNull("userId")
@@ -307,9 +309,14 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         ThrowUtils.throwIf(current <= 0 || pageSize <= 0, ErrorCode.PARAMS_ERROR, "分页参数不合法");
 
         String taskName = StrUtil.trim(taskQueryRequest.getTaskName());
+
+        closeExpiredTasks();
+
         QueryWrapper<Task> queryWrapper = new QueryWrapper<Task>()
                 .isNull("userId")
-                .eq("taskStatus", TaskStatusEnum.OPEN.getValue())
+                .in("taskStatus", Arrays.asList(
+                        TaskStatusEnum.OPEN.getValue(),
+                        TaskStatusEnum.CLOSE.getValue()))
                 .like(StrUtil.isNotBlank(taskName), "taskName", taskName)
                 .orderByDesc("taskCreateTime");
 
@@ -520,6 +527,17 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
         return record.getId();
     }
 
+    /**
+     * 把已过结束日期的开放任务关闭
+     */
+    private void closeExpiredTasks() {
+        this.lambdaUpdate()
+                .isNull(Task::getUserId)
+                .eq(Task::getTaskStatus, TaskStatusEnum.OPEN.getValue())
+                .lt(Task::getEndDate, DateUtil.beginOfDay(new Date()))
+                .set(Task::getTaskStatus, TaskStatusEnum.CLOSE.getValue())
+                .update();
+    }
 }
 
 
