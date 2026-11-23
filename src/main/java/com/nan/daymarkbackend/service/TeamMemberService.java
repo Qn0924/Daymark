@@ -1,10 +1,13 @@
 package com.nan.daymarkbackend.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nan.daymarkbackend.model.dto.team.TeamApplyQueryRequest;
 import com.nan.daymarkbackend.model.dto.team.TeamJoinApplyRequest;
 import com.nan.daymarkbackend.model.dto.team.TeamJoinAuditRequest;
 import com.nan.daymarkbackend.model.entity.TeamMember;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.nan.daymarkbackend.model.entity.User;
+import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
 
 /**
 * @author 21289
@@ -29,4 +32,20 @@ public interface TeamMemberService extends IService<TeamMember> {
      * @return 是否审核成功
      */
     Boolean auditJoin(TeamJoinAuditRequest teamJoinAuditRequest, User loginUser);
+
+    /**
+     * 审批列表
+     * @param teamApplyQueryRequest
+     * @param loginUser
+     * @return
+     */
+    Page<TeamMemberApplyVO> listApplyByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser);
+
+    /**
+     * 我的申请列表
+     * @param teamApplyQueryRequest
+     * @param loginUser
+     * @return
+     */
+    Page<TeamMemberApplyVO> listMyApplyByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser);
 }

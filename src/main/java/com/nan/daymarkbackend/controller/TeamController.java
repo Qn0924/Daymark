@@ -1,12 +1,15 @@
 package com.nan.daymarkbackend.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.nan.daymarkbackend.common.BaseResponse;
 import com.nan.daymarkbackend.common.ResultUtils;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
+import com.nan.daymarkbackend.model.dto.team.TeamApplyQueryRequest;
 import com.nan.daymarkbackend.model.dto.team.TeamJoinApplyRequest;
 import com.nan.daymarkbackend.model.dto.team.TeamJoinAuditRequest;
 import com.nan.daymarkbackend.model.entity.User;
+import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
 import com.nan.daymarkbackend.service.TeamMemberService;
 import com.nan.daymarkbackend.service.UserService;
 import org.springframework.web.bind.annotation.*;
@@ -52,6 +55,32 @@ public class TeamController {
         ThrowUtils.throwIf(teamJoinAuditRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(httpRequest);
         return ResultUtils.success(teamMemberService.auditJoin(teamJoinAuditRequest, loginUser));
+    }
+
+    /**
+     * 审批列表
+     * @param teamApplyQueryRequest
+     * @param httpRequest
+     * @return
+     */
+    @PostMapping("/join/list/page")
+    public BaseResponse<Page<TeamMemberApplyVO>> listApplyByPage(@RequestBody TeamApplyQueryRequest teamApplyQueryRequest, HttpServletRequest httpRequest) {
+        ThrowUtils.throwIf(teamApplyQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(teamMemberService.listApplyByPage(teamApplyQueryRequest, loginUser));
+    }
+
+    /**
+     * 我的申请入团列表
+     * @param teamApplyQueryRequest
+     * @param httpRequest
+     * @return
+     */
+    @PostMapping("/join/my/list/page")
+    public BaseResponse<Page<TeamMemberApplyVO>> listMyApplyByPage(@RequestBody TeamApplyQueryRequest teamApplyQueryRequest, HttpServletRequest httpRequest) {
+        ThrowUtils.throwIf(teamApplyQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(teamMemberService.listMyApplyByPage(teamApplyQueryRequest, loginUser));
     }
 
 }

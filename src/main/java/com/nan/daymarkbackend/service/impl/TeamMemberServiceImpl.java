@@ -1,9 +1,13 @@
 package com.nan.daymarkbackend.service.impl;
 
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
+import com.nan.daymarkbackend.model.dto.team.TeamApplyQueryRequest;
 import com.nan.daymarkbackend.model.dto.team.TeamJoinApplyRequest;
 import com.nan.daymarkbackend.model.dto.team.TeamJoinAuditRequest;
 import com.nan.daymarkbackend.model.entity.Task;
@@ -11,18 +15,22 @@ import com.nan.daymarkbackend.model.entity.Team;
 import com.nan.daymarkbackend.model.entity.TeamMember;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.enums.*;
+import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
 import com.nan.daymarkbackend.service.TaskService;
 import com.nan.daymarkbackend.service.TeamMemberService;
 import com.nan.daymarkbackend.mapper.TeamMemberMapper;
 import com.nan.daymarkbackend.service.TeamService;
+import com.nan.daymarkbackend.service.UserService;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 /**
 * @author 21289
@@ -40,6 +48,9 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
     @Resource
     private TeamService teamService;
+
+    @Resource
+    private UserService userService;
 
     /**
      * 申请加入团队
@@ -194,6 +205,110 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
         ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "该申请已被处理，请刷新后重试");
         return true;
+    }
+
+    /**
+     * 审批列表
+     * @param teamApplyQueryRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Page<TeamMemberApplyVO> listApplyByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser) {
+        ThrowUtils.throwIf(teamApplyQueryRequest==null,ErrorCode.PARAMS_ERROR);
+
+        String status;
+        if (StrUtil.isBlank(teamApplyQueryRequest.getStatus())) {
+            status = TeamMemberStatusEnum.PENDING.getValue();
+        } else {
+            status = teamApplyQueryRequest.getStatus();
+        }
+
+        //分页查询
+        Page<TeamMember> page = this.page(new Page<>(teamApplyQueryRequest.getCurrent(), teamApplyQueryRequest.getPageSize()),
+                new LambdaQueryWrapper<TeamMember>()
+                        .apply("teamId IN (SELECT id FROM team WHERE ownerUserId = {0} AND isDelete = 0)",
+                                loginUser.getId())
+                        .eq(TeamMember::getJoinType, TeamJoinTypeEnum.APPLY.getValue())
+                        .eq(TeamMember::getStatus, status)
+                        .orderByAsc(TeamMember::getCreateTime));
+
+        //脱敏
+        List<TeamMemberApplyVO> voList = new ArrayList<>();
+        for (TeamMember member : page.getRecords()) {
+            TeamMemberApplyVO vo = toVO(member);
+            Team team = teamService.getById(member.getTeamId());
+            if (team != null) {
+                vo.setTeamName(team.getTeamName());
+            }
+            User user = userService.getById(member.getUserId());
+            if (user != null) {
+                vo.setUserName(user.getUserName());
+                vo.setUserAvatar(user.getUserAvatar());
+            }
+            voList.add(vo);
+        }
+        return toVoPage(page, voList);
+    }
+
+    /**
+     * 我的申请加团列表
+     * @param teamApplyQueryRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Page<TeamMemberApplyVO> listMyApplyByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser) {
+        ThrowUtils.throwIf(teamApplyQueryRequest==null,ErrorCode.PARAMS_ERROR);
+        //分页查询
+        Page<TeamMember> page = this.page(new Page<>(teamApplyQueryRequest.getCurrent(), teamApplyQueryRequest.getPageSize()),
+                new LambdaQueryWrapper<TeamMember>()
+                        .eq(TeamMember::getUserId, loginUser.getId())
+                        .orderByDesc(TeamMember::getCreateTime));
+
+        //脱敏
+        List<TeamMemberApplyVO> voList = new ArrayList<>();
+        for (TeamMember member : page.getRecords()) {
+            TeamMemberApplyVO vo = toVO(member);
+            Team team = teamService.getById(member.getTeamId());
+            vo.setUserName(loginUser.getUserName());
+            vo.setUserAvatar(loginUser.getUserAvatar());
+            if (team != null) {
+                vo.setTeamName(team.getTeamName());
+            }
+            voList.add(vo);
+        }
+        return toVoPage(page, voList);
+
+    }
+
+    /**
+     * 转vo
+     * @param member
+     * @return
+     */
+    private TeamMemberApplyVO toVO(TeamMember member) {
+        TeamMemberApplyVO vo = new TeamMemberApplyVO();
+        vo.setId(member.getId());
+        vo.setTeamId(member.getTeamId());
+        vo.setUserId(member.getUserId());
+        vo.setStatus(member.getStatus());
+        vo.setApplyReason(member.getApplyReason());
+        vo.setCreateTime(member.getCreateTime());
+        vo.setReviewRemark(member.getReviewRemark());
+        return vo;
+    }
+
+    /**
+     * 分页转vo
+     * @param page
+     * @param voList
+     * @return
+     */
+    private Page<TeamMemberApplyVO> toVoPage(Page<TeamMember> page, List<TeamMemberApplyVO> voList) {
+        Page<TeamMemberApplyVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        voPage.setRecords(voList);
+        return voPage;
     }
 }
 
