@@ -1,11 +1,9 @@
 package com.nan.daymarkbackend.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.nan.daymarkbackend.model.dto.team.TeamJoinApplyRequest;
-import com.nan.daymarkbackend.model.entity.Team;
-import com.nan.daymarkbackend.model.entity.User;
-import com.nan.daymarkbackend.service.TeamService;
 import com.nan.daymarkbackend.mapper.TeamMapper;
+import com.nan.daymarkbackend.model.entity.Team;
+import com.nan.daymarkbackend.service.TeamService;
 import org.springframework.stereotype.Service;
 
 /**
@@ -17,17 +15,7 @@ import org.springframework.stereotype.Service;
 public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
     implements TeamService{
 
-    /**
-     * 申请加入团队
-     * @param teamJoinApplyRequest   申请请求
-     * @param loginUser 当前登录用户
-     * @return
-     */
-    @Override
-    public Boolean applyJoin(TeamJoinApplyRequest teamJoinApplyRequest, User loginUser) {
 
-
-    }
 }
 
 

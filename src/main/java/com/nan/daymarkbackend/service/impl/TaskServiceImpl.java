@@ -443,7 +443,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
                         TeamMemberRoleEnum.OWNER.getValue(),
                         TeamMemberRoleEnum.WORKER.getValue())
                 .count();
-        ThrowUtils.throwIf(memberCount == null || memberCount <= 0, ErrorCode.NO_AUTH_ERROR, "你不是该打卡团成员");
+        ThrowUtils.throwIf(memberCount == null || memberCount <= 0, ErrorCode.NO_AUTH_ERROR, "你不是该打卡团成员，请先加入团队");
 
         //不能重复打卡
         Long existCount = this.lambdaQuery()

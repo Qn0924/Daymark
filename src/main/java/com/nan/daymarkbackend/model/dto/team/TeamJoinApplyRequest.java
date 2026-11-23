@@ -15,6 +15,10 @@ public class TeamJoinApplyRequest implements Serializable {
      */
     private Long taskId;
 
+    /**
+     * 申请理由
+     */
+    private String applyReason;
 
     private static final long serialVersionUID = 1L;
 }
