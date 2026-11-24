@@ -2,19 +2,19 @@ package com.nan.daymarkbackend.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
-import com.nan.daymarkbackend.model.dto.team.TeamApplyQueryRequest;
-import com.nan.daymarkbackend.model.dto.team.TeamJoinApplyRequest;
-import com.nan.daymarkbackend.model.dto.team.TeamJoinAuditRequest;
+import com.nan.daymarkbackend.model.dto.team.*;
 import com.nan.daymarkbackend.model.entity.Task;
 import com.nan.daymarkbackend.model.entity.Team;
 import com.nan.daymarkbackend.model.entity.TeamMember;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.enums.*;
+import com.nan.daymarkbackend.model.vo.TeamInviteVO;
 import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
 import com.nan.daymarkbackend.service.TaskService;
 import com.nan.daymarkbackend.service.TeamMemberService;
@@ -216,6 +216,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
     @Override
     public Page<TeamMemberApplyVO> listApplyByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser) {
         ThrowUtils.throwIf(teamApplyQueryRequest==null,ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
 
         String status;
         if (StrUtil.isBlank(teamApplyQueryRequest.getStatus())) {
@@ -260,6 +261,8 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
     @Override
     public Page<TeamMemberApplyVO> listMyApplyByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser) {
         ThrowUtils.throwIf(teamApplyQueryRequest==null,ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
         //分页查询
         Page<TeamMember> page = this.page(new Page<>(teamApplyQueryRequest.getCurrent(), teamApplyQueryRequest.getPageSize()),
                 new LambdaQueryWrapper<TeamMember>()
@@ -280,6 +283,193 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         }
         return toVoPage(page, voList);
 
+    }
+
+    /**
+     * 邀请成员
+     *
+     * @param teamInviteAddRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Boolean inviteMember(TeamInviteAddRequest teamInviteAddRequest, User loginUser) {
+        ThrowUtils.throwIf(teamInviteAddRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        Long teamId = teamInviteAddRequest.getTeamId();
+        Team team = teamService.getById(teamId);
+        if (!team.getOwnerUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "只有团队负责人可以邀请成员！");
+        }
+
+        Long targetUserId = teamInviteAddRequest.getTargetUserId();
+        User targetUser = userService.getById(targetUserId);
+        ThrowUtils.throwIf(targetUser == null, ErrorCode.PARAMS_ERROR, "指定用户不存在！");
+
+        TeamMember member = this.lambdaQuery()
+                .eq(TeamMember::getTeamId, teamId)
+                .eq(TeamMember::getUserId, targetUserId)
+                .one();
+        if (member != null) {
+            if (TeamMemberStatusEnum.ACTIVE.getValue().equals(member.getStatus())) {
+                ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "该用户已在团队中");
+            }
+            if (TeamMemberStatusEnum.PENDING.getValue().equals(member.getStatus())) {
+                ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "该用户已有待处理的申请或邀请");
+            }
+
+            boolean updated = this.lambdaUpdate()
+                    .eq(TeamMember::getId, member.getId())
+                    .in(TeamMember::getStatus, Arrays.asList(
+                            TeamMemberStatusEnum.REJECTED.getValue(),
+                            TeamMemberStatusEnum.LEFT.getValue(),
+                            TeamMemberStatusEnum.REMOVED.getValue(),
+                            TeamMemberStatusEnum.CANCELLED.getValue()))
+                    .set(TeamMember::getStatus, TeamMemberStatusEnum.PENDING.getValue())
+                    .set(TeamMember::getRole, TeamMemberRoleEnum.WORKER.getValue())
+                    .set(TeamMember::getJoinType, TeamJoinTypeEnum.INVITE.getValue())
+                    .set(TeamMember::getInviterUserId, loginUser.getId())
+                    .set(TeamMember::getApplyReason, teamInviteAddRequest.getMessage())
+                    .set(TeamMember::getJoinTime, null)
+                    .set(TeamMember::getReviewerUserId, null)
+                    .set(TeamMember::getReviewTime, null)
+                    .set(TeamMember::getReviewRemark, null)
+                    .set(TeamMember::getLeaveTime, null)
+                    .set(TeamMember::getLeaveReason, null)
+                    .set(TeamMember::getLeaveUserId, null)
+                    .update();
+            ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "邀请失败，请稍后重试");
+            return true;
+        }
+
+        TeamMember newMember = new TeamMember();
+        newMember.setTeamId(team.getId());
+        newMember.setUserId(targetUserId);
+        newMember.setRole(TeamMemberRoleEnum.WORKER.getValue());
+        newMember.setStatus(TeamMemberStatusEnum.PENDING.getValue());
+        newMember.setJoinType(TeamJoinTypeEnum.INVITE.getValue());
+        newMember.setInviterUserId(loginUser.getId());
+        newMember.setApplyReason(teamInviteAddRequest.getMessage());
+
+        try {
+            ThrowUtils.throwIf(!this.save(newMember), ErrorCode.OPERATION_ERROR, "邀请失败，请稍后重试");
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "请勿重复邀请");
+        }
+        return true;
+
+
+    }
+
+    /**
+     * 成员处理邀请
+     *
+     * @param teamInviteHandleRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Boolean handleInvite(TeamInviteHandleRequest teamInviteHandleRequest, User loginUser) {
+        ThrowUtils.throwIf(teamInviteHandleRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        Long memberId = teamInviteHandleRequest.getMemberId();
+        TeamMember teamMember = this.getById(memberId);
+        ThrowUtils.throwIf(teamMember==null,ErrorCode.PARAMS_ERROR,"记录不存在！");
+
+        //必须是邀请记录
+        ThrowUtils.throwIf(!TeamJoinTypeEnum.INVITE.getValue().equals(teamMember.getJoinType()), ErrorCode.OPERATION_ERROR, "该记录不是邀请");
+        // 只有被邀请人自己能处理
+        ThrowUtils.throwIf(!teamMember.getUserId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "只能处理发给自己的邀请");
+        // 只能处理一次
+        ThrowUtils.throwIf(!TeamMemberStatusEnum.PENDING.getValue().equals(teamMember.getStatus()), ErrorCode.OPERATION_ERROR, "该邀请已处理");
+
+
+        Boolean accepted = teamInviteHandleRequest.getAccepted();
+        String remark = teamInviteHandleRequest.getRemark();
+
+        Date now = new Date();
+        String finalStatus;
+        Date finalJoinTime;
+
+        if (accepted) {
+            // 接受前再确认团队仍可加入
+            Team team = teamService.getById(teamMember.getTeamId());
+            ThrowUtils.throwIf(team == null, ErrorCode.NOT_FOUND_ERROR, "团队不存在");
+            ThrowUtils.throwIf(!TeamStatusEnum.ACTIVE.getValue().equals(team.getStatus()), ErrorCode.OPERATION_ERROR, "团队已解散，无法加入");
+            finalStatus = TeamMemberStatusEnum.ACTIVE.getValue();
+            finalJoinTime = now;
+        } else {
+            finalStatus = TeamMemberStatusEnum.REJECTED.getValue();
+            finalJoinTime = null;
+        }
+
+        boolean updated = this.lambdaUpdate()
+                .eq(TeamMember::getId, teamMember.getId())
+                .eq(TeamMember::getStatus, TeamMemberStatusEnum.PENDING.getValue())
+                .set(TeamMember::getStatus, finalStatus)
+                .set(TeamMember::getReviewerUserId, loginUser.getId())
+                .set(TeamMember::getReviewTime, now)
+                .set(TeamMember::getReviewRemark, remark)
+                .set(TeamMember::getJoinTime, finalJoinTime)
+                .update();
+        ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "邀请已被处理，请刷新后重试");
+        return true;
+    }
+
+    /**
+     * 我收到的邀请列表
+     *
+     * @param teamApplyQueryRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Page<TeamInviteVO> listMyInviteByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser) {
+        ThrowUtils.throwIf(teamApplyQueryRequest==null,ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser==null,ErrorCode.NOT_LOGIN_ERROR);
+
+        String status = teamApplyQueryRequest.getStatus();
+        if (StrUtil.isBlank(status)) {
+            status = TeamMemberStatusEnum.PENDING.getValue();
+        }
+
+        QueryWrapper<TeamMember> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("userId", loginUser.getId());
+        queryWrapper.eq("joinType", TeamJoinTypeEnum.INVITE.getValue());
+        queryWrapper.eq("status", status);
+        queryWrapper.orderByDesc("createTime");
+
+        Page<TeamMember> page = this.page(new Page<>(teamApplyQueryRequest.getCurrent(), teamApplyQueryRequest.getPageSize()), queryWrapper);
+
+        List<TeamInviteVO> voList = new ArrayList<>();
+        for (TeamMember member : page.getRecords()) {
+            TeamInviteVO vo = new TeamInviteVO();
+            vo.setId(member.getId());
+            vo.setTeamId(member.getTeamId());
+            vo.setInviterUserId(member.getInviterUserId());
+            vo.setStatus(member.getStatus());
+            vo.setMessage(member.getApplyReason());
+            vo.setCreateTime(member.getCreateTime());
+
+            Team team = teamService.getById(member.getTeamId());
+            if (team != null) {
+                vo.setTeamName(team.getTeamName());
+            }
+            if (member.getInviterUserId() != null) {
+                User inviter = userService.getById(member.getInviterUserId());
+                if (inviter != null) {
+                    vo.setInviterName(inviter.getUserName());
+                    vo.setInviterAvatar(inviter.getUserAvatar());
+                }
+            }
+            voList.add(vo);
+        }
+
+        Page<TeamInviteVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        voPage.setRecords(voList);
+        return voPage;
     }
 
     /**
