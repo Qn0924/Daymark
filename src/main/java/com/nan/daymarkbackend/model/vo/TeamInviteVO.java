@@ -1,5 +1,6 @@
 package com.nan.daymarkbackend.model.vo;
 
+import com.nan.daymarkbackend.model.entity.TeamMember;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -47,6 +48,11 @@ public class TeamInviteVO implements Serializable {
     private String status;
 
     /**
+     * 角色
+     */
+    private String role;
+
+    /**
      * 邀请留言
      */
     private String message;
@@ -57,4 +63,16 @@ public class TeamInviteVO implements Serializable {
     private Date createTime;
 
     private static final long serialVersionUID = 1L;
+
+    public static TeamInviteVO ObjToVO(TeamMember member) {
+        TeamInviteVO vo = new TeamInviteVO();
+        vo.setId(member.getId());
+        vo.setTeamId(member.getTeamId());
+        vo.setRole(member.getRole());
+        vo.setInviterUserId(member.getInviterUserId());
+        vo.setStatus(member.getStatus());
+        vo.setMessage(member.getApplyReason());
+        vo.setCreateTime(member.getCreateTime());
+        return vo;
+    }
 }

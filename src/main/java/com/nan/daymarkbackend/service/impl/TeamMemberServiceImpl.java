@@ -62,9 +62,9 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
     @Transactional(rollbackFor = Exception.class)
     public Boolean applyJoin(TeamJoinApplyRequest teamJoinApplyRequest, User loginUser) {
         //参数校验
-        ThrowUtils.throwIf(teamJoinApplyRequest == null || teamJoinApplyRequest.getTaskId() == null || teamJoinApplyRequest.getTaskId() <= 0, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(teamJoinApplyRequest == null, ErrorCode.PARAMS_ERROR);
         //登录校验
-        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR);
+        ThrowUtils.throwIf(loginUser == null , ErrorCode.NOT_LOGIN_ERROR);
 
         //查任务
         Task task = taskService.lambdaQuery()
@@ -72,7 +72,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
                 .isNull(Task::getUserId)
                 .one();
         ThrowUtils.throwIf(task == null, ErrorCode.NOT_FOUND_ERROR, "任务不存在");
-        ThrowUtils.throwIf(!TaskStatusEnum.OPEN.getValue().equals(task.getTaskStatus()), ErrorCode.OPERATION_ERROR, "任务已结束，无法加入");
+        ThrowUtils.throwIf(!TaskStatusEnum.OPEN.getValue().equals(task.getTaskStatus()), ErrorCode.OPERATION_ERROR, "任务当前不可加入");
 
         //查团队状态
         Team team = teamService.getById(task.getTeamId());
@@ -88,15 +88,24 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
             if (existMember != null) {
                 String currentStatus = existMember.getStatus();
                 String pendingStatus = TeamMemberStatusEnum.PENDING.getValue();
+                String existMemberRole = existMember.getRole();
 
                 // 正在审批中，直接拦截
                 if (pendingStatus.equals(currentStatus)) {
-                    ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "已提交申请，请等待审批");
+                    if (TeamMemberRoleEnum.MENTOR.getValue().equals(existMemberRole)) {
+                        ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "您正在被邀请为监督者，请同意或拒绝");
+                    }else{
+                        ThrowUtils.throwIf(true, ErrorCode.PARAMS_ERROR, "已有待处理的申请或邀请");
+                    }
                 }
 
                 // 已经加入团队了
                 if (TeamMemberStatusEnum.ACTIVE.getValue().equals(currentStatus)) {
-                    ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "已加入该团队，不可重复申请！");
+                    if (TeamMemberRoleEnum.MENTOR.getValue().equals(existMemberRole)) {
+                        ThrowUtils.throwIf(true, ErrorCode.PARAMS_ERROR, "已是监督者，不可申请了！");
+                    } else {
+                        ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "已加入该团队，不可重复申请！");
+                    }
                 }
 
                 // 如果是被拒绝、退出、被移除等状态，执行更新复用旧记录操作
@@ -109,7 +118,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
                                 TeamMemberStatusEnum.REMOVED.getValue(),
                                 TeamMemberStatusEnum.CANCELLED.getValue()))
                         .set(TeamMember::getStatus, pendingStatus)
-                        .set(TeamMember::getRole, TeamMemberRoleEnum.WORKER.getValue())
+                        .set(TeamMember::getRole, teamJoinApplyRequest.getRole())
                         .set(TeamMember::getJoinType, TeamJoinTypeEnum.APPLY.getValue())
                         .set(TeamMember::getApplyReason, teamJoinApplyRequest.getApplyReason())
                         // 清空历史数据
@@ -133,7 +142,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
             TeamMember member = new TeamMember();
             member.setTeamId(team.getId());
             member.setUserId(loginUser.getId());
-            member.setRole(TeamMemberRoleEnum.WORKER.getValue());
+            member.setRole(teamJoinApplyRequest.getRole());
             member.setStatus(pendingStatus);
             member.setJoinType(TeamJoinTypeEnum.APPLY.getValue());
             member.setApplyReason(teamJoinApplyRequest.getApplyReason());
@@ -144,7 +153,6 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "请勿重复提交申请");
         }
         return true;
-
         }
 
     /**
@@ -178,7 +186,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
                 .isNull(Task::getUserId)
                 .one();
         ThrowUtils.throwIf(task == null, ErrorCode.NOT_FOUND_ERROR, "任务不存在");
-        ThrowUtils.throwIf(!TaskStatusEnum.OPEN.getValue().equals(task.getTaskStatus()), ErrorCode.OPERATION_ERROR, "任务已结束，无法通过申请");
+        ThrowUtils.throwIf(!TaskStatusEnum.OPEN.getValue().equals(task.getTaskStatus()), ErrorCode.OPERATION_ERROR, "任务当前不开放");
 
         Date now = new Date();
         String finalStatus;
@@ -237,7 +245,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         //脱敏
         List<TeamMemberApplyVO> voList = new ArrayList<>();
         for (TeamMember member : page.getRecords()) {
-            TeamMemberApplyVO vo = toVO(member);
+            TeamMemberApplyVO vo = TeamMemberApplyVO.ObjToVO(member);
             Team team = teamService.getById(member.getTeamId());
             if (team != null) {
                 vo.setTeamName(team.getTeamName());
@@ -249,7 +257,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
             }
             voList.add(vo);
         }
-        return toVoPage(page, voList);
+        return getTeamMemberApplyVOPage(page, voList);
     }
 
     /**
@@ -272,7 +280,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         //脱敏
         List<TeamMemberApplyVO> voList = new ArrayList<>();
         for (TeamMember member : page.getRecords()) {
-            TeamMemberApplyVO vo = toVO(member);
+            TeamMemberApplyVO vo = TeamMemberApplyVO.ObjToVO(member);
             Team team = teamService.getById(member.getTeamId());
             vo.setUserName(loginUser.getUserName());
             vo.setUserAvatar(loginUser.getUserAvatar());
@@ -281,7 +289,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
             }
             voList.add(vo);
         }
-        return toVoPage(page, voList);
+        return getTeamMemberApplyVOPage(page, voList);
 
     }
 
@@ -297,12 +305,16 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         ThrowUtils.throwIf(teamInviteAddRequest == null, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
 
+        //邀请加入团队
         Long teamId = teamInviteAddRequest.getTeamId();
         Team team = teamService.getById(teamId);
+        ThrowUtils.throwIf(team==null,ErrorCode.PARAMS_ERROR);
+        //团队负责人才可邀请
         if (!team.getOwnerUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "只有团队负责人可以邀请成员！");
         }
 
+        //邀请谁
         Long targetUserId = teamInviteAddRequest.getTargetUserId();
         User targetUser = userService.getById(targetUserId);
         ThrowUtils.throwIf(targetUser == null, ErrorCode.PARAMS_ERROR, "指定用户不存在！");
@@ -312,11 +324,22 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
                 .eq(TeamMember::getUserId, targetUserId)
                 .one();
         if (member != null) {
+            String memberRole = member.getRole();
+
             if (TeamMemberStatusEnum.ACTIVE.getValue().equals(member.getStatus())) {
-                ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "该用户已在团队中");
+                if (TeamMemberRoleEnum.MENTOR.getValue().equals(memberRole)) {
+                    ThrowUtils.throwIf(true, ErrorCode.PARAMS_ERROR, "该用户已经是监督者！");
+                } else {
+                    ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "该用户已在团队中");
+                }
             }
+
             if (TeamMemberStatusEnum.PENDING.getValue().equals(member.getStatus())) {
-                ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "该用户已有待处理的申请或邀请");
+                if (TeamMemberRoleEnum.MENTOR.getValue().equals(memberRole)) {
+                    ThrowUtils.throwIf(true, ErrorCode.PARAMS_ERROR, "该用户已经申请监督者，请审批！");
+                } else {
+                    ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "该用户已有待处理的申请或邀请");
+                }
             }
 
             boolean updated = this.lambdaUpdate()
@@ -327,7 +350,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
                             TeamMemberStatusEnum.REMOVED.getValue(),
                             TeamMemberStatusEnum.CANCELLED.getValue()))
                     .set(TeamMember::getStatus, TeamMemberStatusEnum.PENDING.getValue())
-                    .set(TeamMember::getRole, TeamMemberRoleEnum.WORKER.getValue())
+                    .set(TeamMember::getRole, teamInviteAddRequest.getRole())
                     .set(TeamMember::getJoinType, TeamJoinTypeEnum.INVITE.getValue())
                     .set(TeamMember::getInviterUserId, loginUser.getId())
                     .set(TeamMember::getApplyReason, teamInviteAddRequest.getMessage())
@@ -346,7 +369,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         TeamMember newMember = new TeamMember();
         newMember.setTeamId(team.getId());
         newMember.setUserId(targetUserId);
-        newMember.setRole(TeamMemberRoleEnum.WORKER.getValue());
+        newMember.setRole(teamInviteAddRequest.getRole());
         newMember.setStatus(TeamMemberStatusEnum.PENDING.getValue());
         newMember.setJoinType(TeamJoinTypeEnum.INVITE.getValue());
         newMember.setInviterUserId(loginUser.getId());
@@ -445,14 +468,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
         List<TeamInviteVO> voList = new ArrayList<>();
         for (TeamMember member : page.getRecords()) {
-            TeamInviteVO vo = new TeamInviteVO();
-            vo.setId(member.getId());
-            vo.setTeamId(member.getTeamId());
-            vo.setInviterUserId(member.getInviterUserId());
-            vo.setStatus(member.getStatus());
-            vo.setMessage(member.getApplyReason());
-            vo.setCreateTime(member.getCreateTime());
-
+            TeamInviteVO vo=TeamInviteVO.ObjToVO(member);
             Team team = teamService.getById(member.getTeamId());
             if (team != null) {
                 vo.setTeamName(team.getTeamName());
@@ -467,35 +483,29 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
             voList.add(vo);
         }
 
+        return getTeamInviteVOPage(page, voList);
+    }
+
+    /**
+     * 邀请列表分页转vo
+     * @param page
+     * @param voList
+     * @return
+     */
+    private static Page<TeamInviteVO> getTeamInviteVOPage(Page<TeamMember> page, List<TeamInviteVO> voList) {
         Page<TeamInviteVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
         voPage.setRecords(voList);
         return voPage;
     }
 
-    /**
-     * 转vo
-     * @param member
-     * @return
-     */
-    private TeamMemberApplyVO toVO(TeamMember member) {
-        TeamMemberApplyVO vo = new TeamMemberApplyVO();
-        vo.setId(member.getId());
-        vo.setTeamId(member.getTeamId());
-        vo.setUserId(member.getUserId());
-        vo.setStatus(member.getStatus());
-        vo.setApplyReason(member.getApplyReason());
-        vo.setCreateTime(member.getCreateTime());
-        vo.setReviewRemark(member.getReviewRemark());
-        return vo;
-    }
 
     /**
-     * 分页转vo
+     * 申请列表分页转vo
      * @param page
      * @param voList
      * @return
      */
-    private Page<TeamMemberApplyVO> toVoPage(Page<TeamMember> page, List<TeamMemberApplyVO> voList) {
+    private Page<TeamMemberApplyVO> getTeamMemberApplyVOPage(Page<TeamMember> page, List<TeamMemberApplyVO> voList) {
         Page<TeamMemberApplyVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
         voPage.setRecords(voList);
         return voPage;

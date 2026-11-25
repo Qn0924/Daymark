@@ -21,6 +21,11 @@ public class TeamInviteAddRequest implements Serializable {
     private Long targetUserId;
 
     /**
+     * 加入角色
+     */
+    private String role;
+
+    /**
      * 邀请留言
      */
     private String message;

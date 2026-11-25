@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.annotation.*;
 
 import java.io.Serializable;
 import java.util.Date;
+
+import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
 import lombok.Data;
 
 /**
@@ -107,4 +109,6 @@ public class TeamMember implements Serializable {
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
+
+
 }
