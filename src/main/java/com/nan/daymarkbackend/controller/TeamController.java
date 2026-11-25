@@ -7,6 +7,7 @@ import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.team.*;
 import com.nan.daymarkbackend.model.entity.User;
+import com.nan.daymarkbackend.model.vo.TeamInviteSentVO;
 import com.nan.daymarkbackend.model.vo.TeamInviteVO;
 import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
 import com.nan.daymarkbackend.service.TeamMemberService;
@@ -63,10 +64,10 @@ public class TeamController {
      * @return
      */
     @PostMapping("/join/list/page")
-    public BaseResponse<Page<TeamMemberApplyVO>> listApplyByPage(@RequestBody TeamApplyQueryRequest teamApplyQueryRequest, HttpServletRequest httpRequest) {
+    public BaseResponse<Page<TeamMemberApplyVO>> listAudiByPage(@RequestBody TeamQueryRequest teamApplyQueryRequest, HttpServletRequest httpRequest) {
         ThrowUtils.throwIf(teamApplyQueryRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(httpRequest);
-        return ResultUtils.success(teamMemberService.listApplyByPage(teamApplyQueryRequest, loginUser));
+        return ResultUtils.success(teamMemberService.listAuditByPage(teamApplyQueryRequest, loginUser));
     }
 
     /**
@@ -76,7 +77,7 @@ public class TeamController {
      * @return
      */
     @PostMapping("/join/my/list/page")
-    public BaseResponse<Page<TeamMemberApplyVO>> listMyApplyByPage(@RequestBody TeamApplyQueryRequest teamApplyQueryRequest, HttpServletRequest httpRequest) {
+    public BaseResponse<Page<TeamMemberApplyVO>> listMyApplyByPage(@RequestBody TeamQueryRequest teamApplyQueryRequest, HttpServletRequest httpRequest) {
         ThrowUtils.throwIf(teamApplyQueryRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(httpRequest);
         return ResultUtils.success(teamMemberService.listMyApplyByPage(teamApplyQueryRequest, loginUser));
@@ -118,10 +119,23 @@ public class TeamController {
      * @return
      */
     @PostMapping("/invite/my/list/page")
-    public BaseResponse<Page<TeamInviteVO>> listMyInviteByPage(@RequestBody TeamApplyQueryRequest request, HttpServletRequest httpRequest) {
+    public BaseResponse<Page<TeamInviteVO>> listMyInviteByPage(@RequestBody TeamQueryRequest request, HttpServletRequest httpRequest) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(httpRequest);
         return ResultUtils.success(teamMemberService.listMyInviteByPage(request, loginUser));
+    }
+
+    /**
+     * 我发送的邀请列表
+     * @param teamQueryRequest
+     * @param httpRequest
+     * @return
+     */
+    @PostMapping("/invite/sent/list/page")
+    public BaseResponse<Page<TeamInviteSentVO>> listMySentInviteByPage(@RequestBody TeamQueryRequest teamQueryRequest, HttpServletRequest httpRequest) {
+        ThrowUtils.throwIf(teamQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(teamMemberService.listMySentInviteByPage(teamQueryRequest, loginUser));
     }
 
 }

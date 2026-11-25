@@ -5,6 +5,7 @@ import com.nan.daymarkbackend.model.dto.team.*;
 import com.nan.daymarkbackend.model.entity.TeamMember;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.nan.daymarkbackend.model.entity.User;
+import com.nan.daymarkbackend.model.vo.TeamInviteSentVO;
 import com.nan.daymarkbackend.model.vo.TeamInviteVO;
 import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
 
@@ -38,7 +39,7 @@ public interface TeamMemberService extends IService<TeamMember> {
      * @param loginUser
      * @return
      */
-    Page<TeamMemberApplyVO> listApplyByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser);
+    Page<TeamMemberApplyVO> listAuditByPage(TeamQueryRequest teamApplyQueryRequest, User loginUser);
 
     /**
      * 我的申请列表
@@ -46,7 +47,7 @@ public interface TeamMemberService extends IService<TeamMember> {
      * @param loginUser
      * @return
      */
-    Page<TeamMemberApplyVO> listMyApplyByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser);
+    Page<TeamMemberApplyVO> listMyApplyByPage(TeamQueryRequest teamApplyQueryRequest, User loginUser);
 
     /**
      * 邀请成员
@@ -73,5 +74,10 @@ public interface TeamMemberService extends IService<TeamMember> {
      * @param loginUser
      * @return
      */
-    Page<TeamInviteVO> listMyInviteByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser);
+    Page<TeamInviteVO> listMyInviteByPage(TeamQueryRequest teamApplyQueryRequest, User loginUser);
+
+    /**
+     * 我发出的邀请列表
+     */
+    Page<TeamInviteSentVO> listMySentInviteByPage(TeamQueryRequest teamApplyQueryRequest, User loginUser);
 }

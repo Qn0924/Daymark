@@ -4,15 +4,12 @@ import com.nan.daymarkbackend.common.PageRequest;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/**
+ * 申请查询请求
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class TeamApplyQueryRequest extends PageRequest {
-
-    /**
-     * 团队id（负责人列表必传，我的申请不传）
-     */
-    private Long teamId;
-
+public class TeamQueryRequest extends PageRequest {
     /**
      * 状态，不传默认 pending
      */

@@ -1,5 +1,6 @@
 package com.nan.daymarkbackend.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -14,6 +15,7 @@ import com.nan.daymarkbackend.model.entity.Team;
 import com.nan.daymarkbackend.model.entity.TeamMember;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.enums.*;
+import com.nan.daymarkbackend.model.vo.TeamInviteSentVO;
 import com.nan.daymarkbackend.model.vo.TeamInviteVO;
 import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
 import com.nan.daymarkbackend.service.TaskService;
@@ -27,10 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
 * @author 21289
@@ -217,64 +217,102 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
     /**
      * 审批列表
-     * @param teamApplyQueryRequest
+     * @param teamQueryRequest
      * @param loginUser
      * @return
      */
     @Override
-    public Page<TeamMemberApplyVO> listApplyByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser) {
-        ThrowUtils.throwIf(teamApplyQueryRequest==null,ErrorCode.PARAMS_ERROR);
+    public Page<TeamMemberApplyVO> listAuditByPage(TeamQueryRequest teamQueryRequest, User loginUser) {
+        ThrowUtils.throwIf(teamQueryRequest==null,ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
 
         String status;
-        if (StrUtil.isBlank(teamApplyQueryRequest.getStatus())) {
+        if (StrUtil.isBlank(teamQueryRequest.getStatus())) {
             status = TeamMemberStatusEnum.PENDING.getValue();
         } else {
-            status = teamApplyQueryRequest.getStatus();
+            status = teamQueryRequest.getStatus();
         }
 
-        //分页查询
-        Page<TeamMember> page = this.page(new Page<>(teamApplyQueryRequest.getCurrent(), teamApplyQueryRequest.getPageSize()),
-                new LambdaQueryWrapper<TeamMember>()
-                        .apply("teamId IN (SELECT id FROM team WHERE ownerUserId = {0} AND isDelete = 0)",
-                                loginUser.getId())
-                        .eq(TeamMember::getJoinType, TeamJoinTypeEnum.APPLY.getValue())
-                        .eq(TeamMember::getStatus, status)
-                        .orderByAsc(TeamMember::getCreateTime));
+        QueryWrapper<Team> teamQueryWrapper = new QueryWrapper<>();
+        teamQueryWrapper.eq("ownerUserId", loginUser.getId());
+        List<Team> myTeamList = teamService.list(teamQueryWrapper);
 
-        //脱敏
+        if (CollUtil.isEmpty(myTeamList)) {
+            return new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize(), 0);
+        }
+
+        List<Long> myTeamIds = new ArrayList<>();
+        for (Team team : myTeamList) {
+            myTeamIds.add(team.getId());
+        }
+
+        QueryWrapper<TeamMember> queryWrapper = new QueryWrapper<>();
+        queryWrapper.in("teamId", myTeamIds);
+        queryWrapper.eq("joinType", TeamJoinTypeEnum.APPLY.getValue());
+        queryWrapper.eq("status", status);
+        queryWrapper.orderByAsc("createTime");
+
+        Page<TeamMember> page = this.page(new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize()), queryWrapper);
+
         List<TeamMemberApplyVO> voList = new ArrayList<>();
+        if (page.getRecords().isEmpty()) {
+            Page<TeamMemberApplyVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+            voPage.setRecords(voList);
+            return voPage;
+        }
+
+        List<Long> teamIds = new ArrayList<>();
+        List<Long> userIds = new ArrayList<>();
+        for (TeamMember member : page.getRecords()) {
+            teamIds.add(member.getTeamId());
+            userIds.add(member.getUserId());
+        }
+
+        Map<Long, List<Team>> teamMap = teamService.listByIds(teamIds)
+                .stream()
+                .collect(Collectors.groupingBy(Team::getId));
+        Map<Long, List<User>> userMap = userService.listByIds(userIds)
+                .stream()
+                .collect(Collectors.groupingBy(User::getId));
+
         for (TeamMember member : page.getRecords()) {
             TeamMemberApplyVO vo = TeamMemberApplyVO.ObjToVO(member);
-            Team team = teamService.getById(member.getTeamId());
-            if (team != null) {
+
+            if (teamMap.containsKey(member.getTeamId())) {
+                Team team = teamMap.get(member.getTeamId()).get(0);
                 vo.setTeamName(team.getTeamName());
             }
-            User user = userService.getById(member.getUserId());
-            if (user != null) {
+
+            if (userMap.containsKey(member.getUserId())) {
+                User user = userMap.get(member.getUserId()).get(0);
                 vo.setUserName(user.getUserName());
                 vo.setUserAvatar(user.getUserAvatar());
             }
+
             voList.add(vo);
         }
-        return getTeamMemberApplyVOPage(page, voList);
+
+        Page<TeamMemberApplyVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        voPage.setRecords(voList);
+        return voPage;
     }
 
     /**
      * 我的申请加团列表
-     * @param teamApplyQueryRequest
+     * @param teamQueryRequest
      * @param loginUser
      * @return
      */
     @Override
-    public Page<TeamMemberApplyVO> listMyApplyByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser) {
-        ThrowUtils.throwIf(teamApplyQueryRequest==null,ErrorCode.PARAMS_ERROR);
+    public Page<TeamMemberApplyVO> listMyApplyByPage(TeamQueryRequest teamQueryRequest, User loginUser) {
+        ThrowUtils.throwIf(teamQueryRequest==null,ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
 
         //分页查询
-        Page<TeamMember> page = this.page(new Page<>(teamApplyQueryRequest.getCurrent(), teamApplyQueryRequest.getPageSize()),
+        Page<TeamMember> page = this.page(new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize()),
                 new LambdaQueryWrapper<TeamMember>()
                         .eq(TeamMember::getUserId, loginUser.getId())
+                        .eq(TeamMember::getJoinType, TeamJoinTypeEnum.APPLY.getValue())
                         .orderByDesc(TeamMember::getCreateTime));
 
         //脱敏
@@ -444,16 +482,16 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
     /**
      * 我收到的邀请列表
      *
-     * @param teamApplyQueryRequest
+     * @param teamQueryRequest
      * @param loginUser
      * @return
      */
     @Override
-    public Page<TeamInviteVO> listMyInviteByPage(TeamApplyQueryRequest teamApplyQueryRequest, User loginUser) {
-        ThrowUtils.throwIf(teamApplyQueryRequest==null,ErrorCode.PARAMS_ERROR);
+    public Page<TeamInviteVO> listMyInviteByPage(TeamQueryRequest teamQueryRequest, User loginUser) {
+        ThrowUtils.throwIf(teamQueryRequest==null,ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(loginUser==null,ErrorCode.NOT_LOGIN_ERROR);
 
-        String status = teamApplyQueryRequest.getStatus();
+        String status = teamQueryRequest.getStatus();
         if (StrUtil.isBlank(status)) {
             status = TeamMemberStatusEnum.PENDING.getValue();
         }
@@ -464,7 +502,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         queryWrapper.eq("status", status);
         queryWrapper.orderByDesc("createTime");
 
-        Page<TeamMember> page = this.page(new Page<>(teamApplyQueryRequest.getCurrent(), teamApplyQueryRequest.getPageSize()), queryWrapper);
+        Page<TeamMember> page = this.page(new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize()), queryWrapper);
 
         List<TeamInviteVO> voList = new ArrayList<>();
         for (TeamMember member : page.getRecords()) {
@@ -484,6 +522,46 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         }
 
         return getTeamInviteVOPage(page, voList);
+    }
+
+    /**
+     * 我发出的邀请
+     * @param teamQueryRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Page<TeamInviteSentVO> listMySentInviteByPage(TeamQueryRequest teamQueryRequest, User loginUser) {
+        ThrowUtils.throwIf(teamQueryRequest==null,ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser==null,ErrorCode.NOT_LOGIN_ERROR);
+
+        QueryWrapper<TeamMember> queryWrapper = new QueryWrapper<>();
+        // 谁发出的邀请
+        queryWrapper.eq("inviterUserId", loginUser.getId());
+        queryWrapper.eq("joinType", TeamJoinTypeEnum.INVITE.getValue());
+        queryWrapper.eq(StrUtil.isNotBlank(teamQueryRequest.getStatus()), "status", teamQueryRequest.getStatus());
+        queryWrapper.orderByDesc("createTime");
+
+        Page<TeamMember> page = this.page(new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize()), queryWrapper);
+
+        List<TeamInviteSentVO> voList = new ArrayList<>();
+        for (TeamMember member : page.getRecords()) {
+            TeamInviteSentVO vo=TeamInviteSentVO.ObjToVO(member);
+
+            Team team = teamService.getById(member.getTeamId());
+            if (team != null) {
+                vo.setTeamName(team.getTeamName());
+            }
+            User invitee = userService.getById(member.getUserId());
+            if (invitee != null) {
+                vo.setUserName(invitee.getUserName());
+                vo.setUserAvatar(invitee.getUserAvatar());
+            }
+            voList.add(vo);
+        }
+        Page<TeamInviteSentVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        voPage.setRecords(voList);
+        return voPage;
     }
 
     /**
