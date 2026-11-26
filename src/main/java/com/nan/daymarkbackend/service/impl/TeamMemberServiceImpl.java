@@ -614,6 +614,45 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
     }
 
     /**
+     * 退出团队
+     * @param teamMemberLeaveRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Boolean leaveTeam(TeamMemberLeaveRequest teamMemberLeaveRequest, User loginUser) {
+        //校验
+        ThrowUtils.throwIf(teamMemberLeaveRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        //是否是该团队
+        Long teamId = teamMemberLeaveRequest.getTeamId();
+        TeamMember member = this.lambdaQuery()
+                .eq(TeamMember::getTeamId, teamId)
+                .eq(TeamMember::getUserId, loginUser.getId())
+                .one();
+        ThrowUtils.throwIf(member == null, ErrorCode.NOT_FOUND_ERROR, "你不是该团队成员");
+
+        //正常状态才可退出
+        ThrowUtils.throwIf(!TeamMemberStatusEnum.ACTIVE.getValue().equals(member.getStatus()), ErrorCode.OPERATION_ERROR, "当前状态不可退出");
+
+        //创建人不可退出，只可解散团队
+        ThrowUtils.throwIf(TeamMemberRoleEnum.OWNER.getValue().equals(member.getRole()), ErrorCode.NO_AUTH_ERROR, "团队负责人不能主动退出，只可解散团队");
+
+        Date now = new Date();
+        boolean updated = this.lambdaUpdate()
+                .eq(TeamMember::getId, member.getId())
+                .eq(TeamMember::getStatus, TeamMemberStatusEnum.ACTIVE.getValue())
+                .set(TeamMember::getStatus, TeamMemberStatusEnum.LEFT.getValue())
+                .set(TeamMember::getLeaveTime, now)
+                .set(TeamMember::getLeaveUserId, loginUser.getId())
+                .update();
+
+        ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "退出失败，请刷新后重试");
+        return true;
+    }
+
+    /**
      * 分页转换
      * @param sourcePage
      * @param records

@@ -80,4 +80,12 @@ public interface TeamMemberService extends IService<TeamMember> {
      * 我发出的邀请列表
      */
     Page<TeamInviteSentVO> listMySentInviteByPage(TeamQueryRequest teamApplyQueryRequest, User loginUser);
+
+    /**
+     * 退出团队
+     * @param teamMemberLeaveRequest
+     * @param loginUser
+     * @return
+     */
+    Boolean leaveTeam(TeamMemberLeaveRequest teamMemberLeaveRequest, User loginUser);
 }

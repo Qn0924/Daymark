@@ -138,4 +138,17 @@ public class TeamController {
         return ResultUtils.success(teamMemberService.listMySentInviteByPage(teamQueryRequest, loginUser));
     }
 
+    /**
+     * 退出团队
+     * @param teamMemberLeaveRequest
+     * @param httpRequest
+     * @return
+     */
+    @PostMapping("/member/leave")
+    public BaseResponse<Boolean> leaveTeam(@RequestBody TeamMemberLeaveRequest teamMemberLeaveRequest, HttpServletRequest httpRequest) {
+        ThrowUtils.throwIf(teamMemberLeaveRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(teamMemberService.leaveTeam(teamMemberLeaveRequest, loginUser));
+    }
+
 }
