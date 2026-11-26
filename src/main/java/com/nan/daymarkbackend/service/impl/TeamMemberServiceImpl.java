@@ -10,19 +10,13 @@ import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.team.*;
-import com.nan.daymarkbackend.model.entity.Task;
-import com.nan.daymarkbackend.model.entity.Team;
-import com.nan.daymarkbackend.model.entity.TeamMember;
-import com.nan.daymarkbackend.model.entity.User;
+import com.nan.daymarkbackend.model.entity.*;
 import com.nan.daymarkbackend.model.enums.*;
 import com.nan.daymarkbackend.model.vo.TeamInviteSentVO;
 import com.nan.daymarkbackend.model.vo.TeamInviteVO;
 import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
-import com.nan.daymarkbackend.service.TaskService;
-import com.nan.daymarkbackend.service.TeamMemberService;
+import com.nan.daymarkbackend.service.*;
 import com.nan.daymarkbackend.mapper.TeamMemberMapper;
-import com.nan.daymarkbackend.service.TeamService;
-import com.nan.daymarkbackend.service.UserService;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -51,6 +45,9 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private StudytimeService studytimeService;
 
     /**
      * 申请加入团队
@@ -731,6 +728,63 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         }
         return true;
 
+    }
+
+    /**
+     * 移除成员
+     *
+     * @param teamMemberRemoveRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean removeMember(TeamMemberRemoveRequest teamMemberRemoveRequest, User loginUser) {
+        //校验
+        ThrowUtils.throwIf(teamMemberRemoveRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        //查团队
+        Long teamId = teamMemberRemoveRequest.getTeamId();
+        Team team = teamService.getById(teamId);
+        ThrowUtils.throwIf(team == null, ErrorCode.NOT_FOUND_ERROR, "团队不存在");
+
+        //查记录
+        Long memberId = teamMemberRemoveRequest.getMemberId();
+        TeamMember target = this.getById(memberId);
+        ThrowUtils.throwIf(target == null, ErrorCode.NOT_FOUND_ERROR, "目标成员不存在");
+        ThrowUtils.throwIf(!target.getTeamId().equals(teamId), ErrorCode.PARAMS_ERROR, "该成员不属于此团队");
+        ThrowUtils.throwIf(!TeamMemberStatusEnum.ACTIVE.getValue().equals(target.getStatus()), ErrorCode.OPERATION_ERROR, "该成员不在团队中");
+
+        //操作人身份是否是管理员
+        boolean isAdmin = userService.isAdmin(loginUser);
+        if(TeamMemberRoleEnum.OWNER.getValue().equals(loginUser.getUserRole())||isAdmin){
+            ThrowUtils.throwIf(TeamMemberRoleEnum.OWNER.getValue().equals(target.getRole()), ErrorCode.NO_AUTH_ERROR, "不能移除团队负责人，如负责人违规，直接解散队伍！");
+        }else if(TeamMemberRoleEnum.MENTOR.getValue().equals(loginUser.getUserRole())){
+            ThrowUtils.throwIf(TeamMemberRoleEnum.OWNER.getValue().equals(target.getRole()), ErrorCode.NO_AUTH_ERROR, "不能移除团队负责人");
+            ThrowUtils.throwIf(TeamMemberRoleEnum.MENTOR.getValue().equals(target.getRole()), ErrorCode.NO_AUTH_ERROR, "监督者不能移除其他监督者");
+        }else {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "您没有移除成员的权限");
+        }
+        boolean updated = this.lambdaUpdate()
+                .eq(TeamMember::getId, teamMemberRemoveRequest.getMemberId())
+                .eq(TeamMember::getStatus, TeamMemberStatusEnum.ACTIVE.getValue())
+                .set(TeamMember::getStatus, TeamMemberStatusEnum.REMOVED.getValue())
+                .set(TeamMember::getLeaveTime, new Date())
+                .set(TeamMember::getLeaveUserId, loginUser.getId())
+                .update();
+
+        ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "移除失败，请刷新后重试");
+
+        studytimeService.lambdaUpdate()
+                .eq(Studytime::getTeamId, teamId)
+                .eq(Studytime::getUserId, target.getUserId())
+                .eq(Studytime::getStatus, "running")
+                .set(Studytime::getStatus, "expired")
+                .set(Studytime::getEndTime, new Date())
+                .update();
+
+        return true;
     }
 
     /**

@@ -39,6 +39,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
     @Resource
     private TeamService teamService;
 
+    @Lazy
     @Resource
     private TeamMemberService teamMemberService;
 

@@ -96,4 +96,12 @@ public interface TeamMemberService extends IService<TeamMember> {
      * @return
      */
     Boolean adminGrantMentor(TeamMemberGrantRequest teamMemberGrantRequest, User loginUser);
+
+    /**
+     * 移除成员
+     * @param teamMemberRemoveRequest
+     * @param loginUser
+     * @return
+     */
+    Boolean removeMember(TeamMemberRemoveRequest teamMemberRemoveRequest, User loginUser);
 }

@@ -20,6 +20,7 @@ import com.nan.daymarkbackend.mapper.StudytimeMapper;
 import com.nan.daymarkbackend.service.TaskService;
 import com.nan.daymarkbackend.service.TeamMemberService;
 import com.nan.daymarkbackend.service.UserService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,9 +36,11 @@ import java.util.Date;
 public class StudytimeServiceImpl extends ServiceImpl<StudytimeMapper, Studytime>
     implements StudytimeService{
 
+    @Lazy
     @Resource
     private TaskService taskService;
 
+    @Lazy
     @Resource
     private TeamMemberService teamMemberService;
 

@@ -171,12 +171,33 @@ public class TeamController {
         return ResultUtils.success(teamService.editTeam(teamEditRequest, loginUser));
     }
 
+    /**
+     * 管理员直接授予监督者
+     *
+     * @param teamMemberGrantRequest
+     * @param httpRequest
+     * @return
+     */
     @PostMapping("/member/grant/mentor")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> adminGrantMentor(@RequestBody TeamMemberGrantRequest teamMemberGrantRequest, HttpServletRequest httpRequest) {
         ThrowUtils.throwIf(teamMemberGrantRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(httpRequest);
         return ResultUtils.success(teamMemberService.adminGrantMentor(teamMemberGrantRequest, loginUser));
+    }
+
+    /**
+     * 移除成员
+     *
+     * @param teamMemberRemoveRequest
+     * @param httpRequest
+     * @return
+     */
+    @PostMapping("/member/remove")
+    public BaseResponse<Boolean> removeMember(@RequestBody TeamMemberRemoveRequest teamMemberRemoveRequest, HttpServletRequest httpRequest) {
+        ThrowUtils.throwIf(teamMemberRemoveRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(teamMemberService.removeMember(teamMemberRemoveRequest, loginUser));
     }
 
 }
