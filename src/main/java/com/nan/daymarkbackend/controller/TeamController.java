@@ -11,6 +11,7 @@ import com.nan.daymarkbackend.model.vo.TeamInviteSentVO;
 import com.nan.daymarkbackend.model.vo.TeamInviteVO;
 import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
 import com.nan.daymarkbackend.service.TeamMemberService;
+import com.nan.daymarkbackend.service.TeamService;
 import com.nan.daymarkbackend.service.UserService;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,6 +29,9 @@ public class TeamController {
 
     @Resource
     private TeamMemberService teamMemberService;
+
+    @Resource
+    private TeamService teamService;
 
     /**
      * 申请加入团队
@@ -149,6 +153,19 @@ public class TeamController {
         ThrowUtils.throwIf(teamMemberLeaveRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(httpRequest);
         return ResultUtils.success(teamMemberService.leaveTeam(teamMemberLeaveRequest, loginUser));
+    }
+
+    /**
+     * 修改团队信息
+     * @param teamEditRequest
+     * @param httpRequest
+     * @return
+     */
+    @PostMapping("/edit")
+    public BaseResponse<Boolean> editTeam(@RequestBody TeamEditRequest teamEditRequest, HttpServletRequest httpRequest) {
+        ThrowUtils.throwIf(teamEditRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(teamService.editTeam(teamEditRequest, loginUser));
     }
 
 }
