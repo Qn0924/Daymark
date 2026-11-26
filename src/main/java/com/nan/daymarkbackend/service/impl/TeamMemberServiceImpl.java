@@ -238,7 +238,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         List<Team> myTeamList = teamService.list(teamQueryWrapper);
 
         if (CollUtil.isEmpty(myTeamList)) {
-            return new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize(), 0);
+            return buildPage(new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize()), new ArrayList<>());
         }
 
         List<Long> myTeamIds = new ArrayList<>();
@@ -255,46 +255,38 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         Page<TeamMember> page = this.page(new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize()), queryWrapper);
 
         List<TeamMemberApplyVO> voList = new ArrayList<>();
-        if (page.getRecords().isEmpty()) {
-            Page<TeamMemberApplyVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
-            voPage.setRecords(voList);
-            return voPage;
-        }
-
-        List<Long> teamIds = new ArrayList<>();
-        List<Long> userIds = new ArrayList<>();
-        for (TeamMember member : page.getRecords()) {
-            teamIds.add(member.getTeamId());
-            userIds.add(member.getUserId());
-        }
-
-        Map<Long, List<Team>> teamMap = teamService.listByIds(teamIds)
-                .stream()
-                .collect(Collectors.groupingBy(Team::getId));
-        Map<Long, List<User>> userMap = userService.listByIds(userIds)
-                .stream()
-                .collect(Collectors.groupingBy(User::getId));
-
-        for (TeamMember member : page.getRecords()) {
-            TeamMemberApplyVO vo = TeamMemberApplyVO.ObjToVO(member);
-
-            if (teamMap.containsKey(member.getTeamId())) {
-                Team team = teamMap.get(member.getTeamId()).get(0);
-                vo.setTeamName(team.getTeamName());
+        if (CollUtil.isNotEmpty(page.getRecords())) {
+            List<Long> teamIds = new ArrayList<>();
+            List<Long> userIds = new ArrayList<>();
+            for (TeamMember member : page.getRecords()) {
+                teamIds.add(member.getTeamId());
+                userIds.add(member.getUserId());
             }
 
-            if (userMap.containsKey(member.getUserId())) {
-                User user = userMap.get(member.getUserId()).get(0);
-                vo.setUserName(user.getUserName());
-                vo.setUserAvatar(user.getUserAvatar());
+            Map<Long, List<Team>> teamMap = teamService
+                    .listByIds(teamIds)
+                    .stream()
+                    .collect(Collectors.groupingBy(Team::getId));
+            Map<Long, List<User>> userMap = userService
+                    .listByIds(userIds)
+                    .stream()
+                    .collect(Collectors.groupingBy(User::getId));
+
+            for (TeamMember member : page.getRecords()) {
+                TeamMemberApplyVO vo = TeamMemberApplyVO.ObjToVO(member);
+
+                if (teamMap.containsKey(member.getTeamId())) {
+                    vo.setTeamName(teamMap.get(member.getTeamId()).get(0).getTeamName());
+                }
+                if (userMap.containsKey(member.getUserId())) {
+                    User user = userMap.get(member.getUserId()).get(0);
+                    vo.setUserName(user.getUserName());
+                    vo.setUserAvatar(user.getUserAvatar());
+                }
+                voList.add(vo);
             }
-
-            voList.add(vo);
         }
-
-        Page<TeamMemberApplyVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
-        voPage.setRecords(voList);
-        return voPage;
+        return buildPage(page, voList);
     }
 
     /**
@@ -308,26 +300,41 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         ThrowUtils.throwIf(teamQueryRequest==null,ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
 
-        //分页查询
-        Page<TeamMember> page = this.page(new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize()),
-                new LambdaQueryWrapper<TeamMember>()
-                        .eq(TeamMember::getUserId, loginUser.getId())
-                        .eq(TeamMember::getJoinType, TeamJoinTypeEnum.APPLY.getValue())
-                        .orderByDesc(TeamMember::getCreateTime));
+        QueryWrapper<TeamMember> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("userId", loginUser.getId());
+        queryWrapper.eq("joinType", TeamJoinTypeEnum.APPLY.getValue());
+        queryWrapper.orderByDesc("createTime");
 
-        //脱敏
+        Page<TeamMember> page = this.page(new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize()), queryWrapper);
+
         List<TeamMemberApplyVO> voList = new ArrayList<>();
-        for (TeamMember member : page.getRecords()) {
-            TeamMemberApplyVO vo = TeamMemberApplyVO.ObjToVO(member);
-            Team team = teamService.getById(member.getTeamId());
-            vo.setUserName(loginUser.getUserName());
-            vo.setUserAvatar(loginUser.getUserAvatar());
-            if (team != null) {
-                vo.setTeamName(team.getTeamName());
+
+        if (CollUtil.isNotEmpty(page.getRecords())) {
+            List<Long> teamIds = new ArrayList<>();
+            for (TeamMember member : page.getRecords()) {
+                teamIds.add(member.getTeamId());
             }
-            voList.add(vo);
+
+            Map<Long, List<Team>> teamMap = teamService
+                    .listByIds(teamIds)
+                    .stream()
+                    .collect(Collectors.groupingBy(Team::getId));
+
+            for (TeamMember member : page.getRecords()) {
+                TeamMemberApplyVO vo = TeamMemberApplyVO.ObjToVO(member);
+
+                if (teamMap.containsKey(member.getTeamId())) {
+                    vo.setTeamName(teamMap.get(member.getTeamId()).get(0).getTeamName());
+                }
+
+                vo.setUserName(loginUser.getUserName());
+                vo.setUserAvatar(loginUser.getUserAvatar());
+
+                voList.add(vo);
+            }
         }
-        return getTeamMemberApplyVOPage(page, voList);
+
+        return buildPage(page, voList);
 
     }
 
@@ -505,23 +512,46 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         Page<TeamMember> page = this.page(new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize()), queryWrapper);
 
         List<TeamInviteVO> voList = new ArrayList<>();
-        for (TeamMember member : page.getRecords()) {
-            TeamInviteVO vo=TeamInviteVO.ObjToVO(member);
-            Team team = teamService.getById(member.getTeamId());
-            if (team != null) {
-                vo.setTeamName(team.getTeamName());
+
+        if (CollUtil.isNotEmpty(page.getRecords())) {
+            List<Long> teamIds = new ArrayList<>();
+            List<Long> inviterIds = new ArrayList<>();
+            for (TeamMember member : page.getRecords()) {
+                teamIds.add(member.getTeamId());
+                if (member.getInviterUserId() != null) {
+                    inviterIds.add(member.getInviterUserId());
+                }
             }
-            if (member.getInviterUserId() != null) {
-                User inviter = userService.getById(member.getInviterUserId());
-                if (inviter != null) {
+
+            Map<Long, List<Team>> teamMap = teamService
+                    .listByIds(teamIds)
+                    .stream()
+                    .collect(Collectors.groupingBy(Team::getId));
+
+            Map<Long, List<User>> userMap;
+            if (inviterIds.isEmpty()) {
+                userMap = new HashMap<>();
+            } else {
+                List<User> users = userService.listByIds(inviterIds);
+                userMap = users.stream().collect(Collectors.groupingBy(User::getId));
+            }
+
+            for (TeamMember member : page.getRecords()) {
+                TeamInviteVO vo = TeamInviteVO.ObjToVO(member);
+
+                if (teamMap.containsKey(member.getTeamId())) {
+                    vo.setTeamName(teamMap.get(member.getTeamId()).get(0).getTeamName());
+                }
+                if (member.getInviterUserId() != null && userMap.containsKey(member.getInviterUserId())) {
+                    User inviter = userMap.get(member.getInviterUserId()).get(0);
                     vo.setInviterName(inviter.getUserName());
                     vo.setInviterAvatar(inviter.getUserAvatar());
                 }
+                voList.add(vo);
             }
-            voList.add(vo);
         }
 
-        return getTeamInviteVOPage(page, voList);
+        return buildPage(page, voList);
     }
 
     /**
@@ -545,49 +575,65 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         Page<TeamMember> page = this.page(new Page<>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize()), queryWrapper);
 
         List<TeamInviteSentVO> voList = new ArrayList<>();
-        for (TeamMember member : page.getRecords()) {
-            TeamInviteSentVO vo=TeamInviteSentVO.ObjToVO(member);
 
-            Team team = teamService.getById(member.getTeamId());
-            if (team != null) {
-                vo.setTeamName(team.getTeamName());
+        if (CollUtil.isNotEmpty(page.getRecords())) {
+            List<Long> teamIds = new ArrayList<>();
+            List<Long> userIds = new ArrayList<>();
+            for (TeamMember member : page.getRecords()) {
+                teamIds.add(member.getTeamId());
+                userIds.add(member.getUserId());
             }
-            User invitee = userService.getById(member.getUserId());
-            if (invitee != null) {
-                vo.setUserName(invitee.getUserName());
-                vo.setUserAvatar(invitee.getUserAvatar());
+
+            Map<Long, List<Team>> teamMap = teamService
+                    .listByIds(teamIds)
+                    .stream()
+                    .collect(Collectors.groupingBy(Team::getId));
+            Map<Long, List<User>> userMap = userService
+                    .listByIds(userIds)
+                    .stream()
+                    .collect(Collectors.groupingBy(User::getId));
+
+            for (TeamMember member : page.getRecords()) {
+                TeamInviteSentVO vo = TeamInviteSentVO.ObjToVO(member);
+
+                if (teamMap.containsKey(member.getTeamId())) {
+                    vo.setTeamName(teamMap.get(member.getTeamId()).get(0).getTeamName());
+                }
+                if (userMap.containsKey(member.getUserId())) {
+                    User invitee = userMap.get(member.getUserId()).get(0);
+                    vo.setUserName(invitee.getUserName());
+                    vo.setUserAvatar(invitee.getUserAvatar());
+                }
+                voList.add(vo);
             }
-            voList.add(vo);
         }
-        Page<TeamInviteSentVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
-        voPage.setRecords(voList);
-        return voPage;
+
+        return buildPage(page, voList);
+
+
     }
 
     /**
-     * 邀请列表分页转vo
-     * @param page
-     * @param voList
+     * 分页转换
+     * @param sourcePage
+     * @param records
      * @return
+     * @param <T>
      */
-    private static Page<TeamInviteVO> getTeamInviteVOPage(Page<TeamMember> page, List<TeamInviteVO> voList) {
-        Page<TeamInviteVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
-        voPage.setRecords(voList);
+    private <T> Page<T> buildPage(Page<?> sourcePage, List<T> records) {
+        //新建一个 VO 的分页对象，直接继承原分页的页码、条数、总数
+        Page<T> voPage = new Page<>(sourcePage.getCurrent(), sourcePage.getSize(), sourcePage.getTotal());
+
+        //如果传进来的列表是 null，就塞一个空数组，防止前端收到 null 报错
+        if(records==null){
+            records=new ArrayList<>();
+        }
+        voPage.setRecords(records);
         return voPage;
     }
 
 
-    /**
-     * 申请列表分页转vo
-     * @param page
-     * @param voList
-     * @return
-     */
-    private Page<TeamMemberApplyVO> getTeamMemberApplyVOPage(Page<TeamMember> page, List<TeamMemberApplyVO> voList) {
-        Page<TeamMemberApplyVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
-        voPage.setRecords(voList);
-        return voPage;
-    }
+
 }
 
 
