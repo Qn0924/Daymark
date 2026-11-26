@@ -148,4 +148,17 @@ public class TaskController {
         return ResultUtils.success(taskService.listCheckinCalendar(taskCheckinCalendarRequest, loginUser));
     }
 
+    /**
+     * 删除任务
+     * @param taskDeleteRequest
+     * @param httpRequest
+     * @return
+     */
+    @PostMapping("/delete")
+    public BaseResponse<Boolean> deleteTask(@RequestBody TaskDeleteRequest taskDeleteRequest, HttpServletRequest httpRequest) {
+        ThrowUtils.throwIf(taskDeleteRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(taskService.deleteTask(taskDeleteRequest, loginUser));
+    }
+
 }

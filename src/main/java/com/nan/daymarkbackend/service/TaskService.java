@@ -77,4 +77,11 @@ public interface TaskService extends IService<Task> {
     List<Task> listCheckinCalendar(TaskCheckinCalendarRequest taskCheckinCalendarRequest, User loginUser);
 
 
+    /**
+     * 删除任务，解散团队
+     * @param taskDeleteRequest
+     * @param loginUser
+     * @return
+     */
+    Boolean deleteTask(TaskDeleteRequest taskDeleteRequest, User loginUser);
 }

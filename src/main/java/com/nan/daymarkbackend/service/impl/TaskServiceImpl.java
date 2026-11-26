@@ -377,6 +377,59 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
     }
 
     /**
+     * 删除任务，解散团队
+     * @param taskDeleteRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean deleteTask(TaskDeleteRequest taskDeleteRequest, User loginUser) {
+        //校验参数
+        ThrowUtils.throwIf(taskDeleteRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        //任务是否存在
+        Long taskId = taskDeleteRequest.getTaskId();
+        Task task = this.lambdaQuery()
+                .eq(Task::getTaskId, taskId)
+                .isNull(Task::getUserId)
+                .one();
+        ThrowUtils.throwIf(task == null, ErrorCode.NOT_FOUND_ERROR, "任务不存在");
+
+        //校验身份
+        ThrowUtils.throwIf(!task.getCreatorUserId().equals(loginUser.getId())&&!UserRoleEnum.ADMIN.getValue().equals(loginUser.getUserRole()),ErrorCode.NO_AUTH_ERROR, "只有任务创建人或管理员可以删除任务");
+
+        boolean result = this.removeById(task.getId());
+        ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"任务删除失败");
+
+        //解散队伍
+        Long teamId = task.getTeamId();
+        boolean result1 = teamService.removeById(teamId);
+        ThrowUtils.throwIf(!result1,ErrorCode.OPERATION_ERROR,"团队删除失败");
+
+        teamMemberService.lambdaUpdate()
+                .eq(TeamMember::getTeamId, teamId)
+                .eq(TeamMember::getStatus, TeamMemberStatusEnum.ACTIVE.getValue())
+                .set(TeamMember::getStatus, TeamMemberStatusEnum.LEFT.getValue())
+                .set(TeamMember::getLeaveTime, new Date())
+                .set(TeamMember::getLeaveReason, "任务删除，团队解散")
+                .set(TeamMember::getLeaveUserId, loginUser.getId())
+                .update();
+
+
+        studytimeService.lambdaUpdate()
+                .eq(Studytime::getTeamId, teamId)
+                .eq(Studytime::getStatus, "running")
+                .set(Studytime::getStatus, "expired")
+                .set(Studytime::getEndTime, new Date())
+                .update();
+
+        return true;
+
+    }
+
+    /**
      * 打卡补卡请求校验
      * @param taskCheckinRequest
      * @param loginUser
