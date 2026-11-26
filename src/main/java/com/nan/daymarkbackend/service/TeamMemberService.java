@@ -8,6 +8,9 @@ import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.vo.TeamInviteSentVO;
 import com.nan.daymarkbackend.model.vo.TeamInviteVO;
 import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
+import com.nan.daymarkbackend.model.vo.TeamMemberVO;
+
+import java.util.List;
 
 /**
 * @author 21289
@@ -104,4 +107,13 @@ public interface TeamMemberService extends IService<TeamMember> {
      * @return
      */
     Boolean removeMember(TeamMemberRemoveRequest teamMemberRemoveRequest, User loginUser);
+
+    /**
+     * 成员列表
+     *
+     * @param teamPageQueryRequest
+     * @param loginUser
+     * @return
+     */
+    Page<TeamMemberVO> listTeamMembers(TeamPageQueryRequest teamPageQueryRequest, User loginUser);
 }

@@ -15,6 +15,7 @@ import com.nan.daymarkbackend.model.enums.*;
 import com.nan.daymarkbackend.model.vo.TeamInviteSentVO;
 import com.nan.daymarkbackend.model.vo.TeamInviteVO;
 import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
+import com.nan.daymarkbackend.model.vo.TeamMemberVO;
 import com.nan.daymarkbackend.service.*;
 import com.nan.daymarkbackend.mapper.TeamMemberMapper;
 import org.springframework.context.annotation.Lazy;
@@ -786,6 +787,63 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
         return true;
     }
+
+    /**
+     * 成员列表
+     * @param teamPageQueryRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public Page<TeamMemberVO> listTeamMembers(TeamPageQueryRequest teamPageQueryRequest, User loginUser) {
+        //校验
+        ThrowUtils.throwIf(teamPageQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        Long teamId = teamPageQueryRequest.getTeamId();
+        int current = teamPageQueryRequest.getCurrent();
+        int pageSize = teamPageQueryRequest.getPageSize();
+
+        Page<TeamMember> memberPage = this.lambdaQuery()
+                .eq(TeamMember::getTeamId, teamId)
+                .eq(TeamMember::getStatus, "active")
+                .page(new Page<>(current, pageSize));
+
+        List<TeamMember> members = memberPage.getRecords();
+        List<TeamMemberVO> voList = new ArrayList<>();
+        for (TeamMember member : members) {
+            Long userId = member.getUserId();
+            User user = userService.getById(userId);
+
+            List<Task> records = taskService.lambdaQuery()
+                    .eq(Task::getTeamId, teamId)
+                    .eq(Task::getUserId, userId)
+                    .list();
+
+            int total = 0;
+            for (Task record : records) {
+                if (record.getDuration() != null) {
+                    total += record.getDuration();
+                }
+            }
+
+            TeamMemberVO vo = new TeamMemberVO();
+            vo.setUserId(userId);
+            vo.setUserName(user.getUserName());
+            vo.setUserAvatar(user.getUserAvatar());
+            vo.setRole(member.getRole());
+            vo.setCheckinCount(records.size());
+            vo.setTotalMinutes(total);
+            voList.add(vo);
+        }
+        Page<TeamMemberVO> result = new Page<>();
+        result.setRecords(voList);
+        result.setTotal(memberPage.getTotal());
+        result.setCurrent(current);
+        result.setSize(pageSize);
+        return result;
+    }
+
 
     /**
      * 分页转换
