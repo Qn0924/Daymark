@@ -346,6 +346,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
      * @return
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean inviteMember(TeamInviteAddRequest teamInviteAddRequest, User loginUser) {
         ThrowUtils.throwIf(teamInviteAddRequest == null, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
@@ -650,6 +651,86 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
         ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "退出失败，请刷新后重试");
         return true;
+    }
+
+    /**
+     * 授予监督者
+     *
+     * @param teamMemberGrantRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean adminGrantMentor(TeamMemberGrantRequest teamMemberGrantRequest, User loginUser) {
+        //校验参数
+        ThrowUtils.throwIf(teamMemberGrantRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        //校验团队
+        Long teamId = teamMemberGrantRequest.getTeamId();
+        Team team = teamService.getById(teamId);
+        ThrowUtils.throwIf(team == null, ErrorCode.NOT_FOUND_ERROR, "团队不存在");
+        ThrowUtils.throwIf(!TeamStatusEnum.ACTIVE.getValue().equals(team.getStatus()),ErrorCode.PARAMS_ERROR,"团队未开放");
+
+        //查目标用户
+        Long targetUserId = teamMemberGrantRequest.getTargetUserId();
+        User targetUser = userService.getById(targetUserId);
+        ThrowUtils.throwIf(targetUser == null, ErrorCode.NOT_FOUND_ERROR, "目标用户不存在");
+
+        //查是否已是团队成员
+        TeamMember existMember = this.lambdaQuery()
+                .eq(TeamMember::getTeamId, teamId)
+                .eq(TeamMember::getUserId, targetUserId)
+                .one();
+
+        if (existMember != null) {
+            //是团队成员
+            if (TeamMemberStatusEnum.ACTIVE.getValue().equals(existMember.getStatus())) {
+                ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "该用户已是团队成员或监督者，不能直接授予");
+            }
+            //在待审核
+            if (TeamMemberStatusEnum.PENDING.getValue().equals(existMember.getStatus())) {
+                ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "该用户已有待处理的申请或邀请");
+            }
+
+            boolean updated = this.lambdaUpdate()
+                    .eq(TeamMember::getId, existMember.getId())
+                    .in(TeamMember::getStatus, Arrays.asList(
+                            TeamMemberStatusEnum.REJECTED.getValue(),
+                            TeamMemberStatusEnum.LEFT.getValue(),
+                            TeamMemberStatusEnum.REMOVED.getValue(),
+                            TeamMemberStatusEnum.CANCELLED.getValue()))
+                    .set(TeamMember::getStatus, TeamMemberStatusEnum.ACTIVE.getValue())
+                    .set(TeamMember::getRole, TeamMemberRoleEnum.MENTOR.getValue())
+                    .set(TeamMember::getJoinType, TeamJoinTypeEnum.ADMIN.getValue())
+                    .set(TeamMember::getInviterUserId, loginUser.getId())
+                    .set(TeamMember::getJoinTime, new Date())
+                    // 清空历史退出信息
+                    .set(TeamMember::getLeaveTime, null)
+                    .set(TeamMember::getLeaveReason, null)
+                    .set(TeamMember::getLeaveUserId, null)
+                    .update();
+            ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "授予失败，请稍后重试");
+            return true;
+        }
+
+        TeamMember mentor = new TeamMember();
+        mentor.setTeamId(teamId);
+        mentor.setUserId(targetUserId);
+        mentor.setRole(TeamMemberRoleEnum.MENTOR.getValue());
+        mentor.setStatus(TeamMemberStatusEnum.ACTIVE.getValue());
+        mentor.setJoinType(TeamJoinTypeEnum.ADMIN.getValue());
+        mentor.setInviterUserId(loginUser.getId());
+        mentor.setJoinTime(new Date());
+
+        try {
+            ThrowUtils.throwIf(!this.save(mentor), ErrorCode.OPERATION_ERROR, "授予失败");
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "操作冲突，请刷新后重试");
+        }
+        return true;
+
     }
 
     /**

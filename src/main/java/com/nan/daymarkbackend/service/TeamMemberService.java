@@ -88,4 +88,12 @@ public interface TeamMemberService extends IService<TeamMember> {
      * @return
      */
     Boolean leaveTeam(TeamMemberLeaveRequest teamMemberLeaveRequest, User loginUser);
+
+    /**
+     * 授予监督者
+     * @param teamMemberGrantRequest
+     * @param loginUser
+     * @return
+     */
+    Boolean adminGrantMentor(TeamMemberGrantRequest teamMemberGrantRequest, User loginUser);
 }

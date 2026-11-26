@@ -1,8 +1,10 @@
 package com.nan.daymarkbackend.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nan.daymarkbackend.annotation.AuthCheck;
 import com.nan.daymarkbackend.common.BaseResponse;
 import com.nan.daymarkbackend.common.ResultUtils;
+import com.nan.daymarkbackend.constant.UserConstant;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.task.TaskDeleteRequest;
@@ -169,6 +171,12 @@ public class TeamController {
         return ResultUtils.success(teamService.editTeam(teamEditRequest, loginUser));
     }
 
-
+    @PostMapping("/member/grant/mentor")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> adminGrantMentor(@RequestBody TeamMemberGrantRequest teamMemberGrantRequest, HttpServletRequest httpRequest) {
+        ThrowUtils.throwIf(teamMemberGrantRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(teamMemberService.adminGrantMentor(teamMemberGrantRequest, loginUser));
+    }
 
 }
