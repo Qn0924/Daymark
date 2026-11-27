@@ -1,11 +1,13 @@
 package com.nan.daymarkbackend.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nan.daymarkbackend.constant.UserConstant;
 import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
@@ -800,48 +802,98 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         ThrowUtils.throwIf(teamPageQueryRequest == null, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
 
+        //获取查询请求
         Long teamId = teamPageQueryRequest.getTeamId();
         int current = teamPageQueryRequest.getCurrent();
         int pageSize = teamPageQueryRequest.getPageSize();
 
+        //是否是管理员
+        boolean isAdmin = UserConstant.ADMIN_ROLE.equals(loginUser.getUserRole());
+        //是否是团队成员
+        TeamMember myself = this.lambdaQuery()
+                .eq(TeamMember::getUserId, loginUser.getId())
+                .eq(TeamMember::getTeamId, teamId)
+                .eq(TeamMember::getStatus, "active")
+                .one();
+        ThrowUtils.throwIf(!isAdmin && myself == null, ErrorCode.NO_AUTH_ERROR);
+
+        // 再判断是不是 worker
+        boolean isWorker=false;
+        if(!isAdmin&&myself!=null) {
+             isWorker= "worker".equals(myself.getRole());
+        }
+
+        //查当前页成员记录
         Page<TeamMember> memberPage = this.lambdaQuery()
                 .eq(TeamMember::getTeamId, teamId)
                 .eq(TeamMember::getStatus, "active")
                 .page(new Page<>(current, pageSize));
 
+        //遍历当前成员赋值
         List<TeamMember> members = memberPage.getRecords();
         List<TeamMemberVO> voList = new ArrayList<>();
-        for (TeamMember member : members) {
-            Long userId = member.getUserId();
-            User user = userService.getById(userId);
 
-            List<Task> records = taskService.lambdaQuery()
-                    .eq(Task::getTeamId, teamId)
-                    .eq(Task::getUserId, userId)
-                    .list();
+        // 当前页有成员才做批量查询，否则直接返回空分页
+        if (!members.isEmpty()) {
+            //批量查用户，按 id 分组
+            Set<Long> userIds = members
+                    .stream()
+                    .map(TeamMember::getUserId)
+                    .collect(Collectors.toSet());
 
-            int total = 0;
-            for (Task record : records) {
-                if (record.getDuration() != null) {
-                    total += record.getDuration();
-                }
+            //按userId分用户组
+            Map<Long, List<User>> userMap = userService
+                    .listByIds(userIds)
+                    .stream()
+                    .collect(Collectors.groupingBy(User::getId));
+
+            //批量查任务，按 userId 分组
+            Map<Long, List<Task>> taskMap;
+            //是普通成员，不查
+            if (isWorker) {
+                taskMap = Collections.emptyMap();
+            } else {
+                taskMap = taskService.lambdaQuery()
+                        .eq(Task::getTeamId, teamId)
+                        .in(Task::getUserId, userIds)
+                        .list()
+                        .stream()
+                        .collect(Collectors.groupingBy(Task::getUserId));
             }
 
-            TeamMemberVO vo = new TeamMemberVO();
-            vo.setUserId(userId);
-            vo.setUserName(user.getUserName());
-            vo.setUserAvatar(user.getUserAvatar());
-            vo.setRole(member.getRole());
-            vo.setCheckinCount(records.size());
-            vo.setTotalMinutes(total);
-            voList.add(vo);
+            //循环内赋值从内存查不查数据库快
+            for (TeamMember member : members) {
+                Long userId = member.getUserId();
+
+                TeamMemberVO vo = new TeamMemberVO();
+                vo.setUserId(userId);
+                vo.setRole(member.getRole());
+
+                // 用户信息
+                if (userMap.containsKey(userId)) {
+                    User user = userMap.get(userId).get(0);
+                    vo.setUserName(user.getUserName());
+                    vo.setUserAvatar(user.getUserAvatar());
+                }
+
+                // 不是普通成员进行任务统计
+                if (!isWorker) {
+                    List<Task> records = taskMap.getOrDefault(userId, Collections.emptyList());
+                    int total = 0;
+                    for (Task record : records) {
+                        if (record.getDuration() != null) {
+                            total += record.getDuration();
+                        }
+                    }
+                    vo.setCheckinCount(records.size());
+                    vo.setTotalMinutes(total);
+                }
+                voList.add(vo);
+            }
         }
-        Page<TeamMemberVO> result = new Page<>();
-        result.setRecords(voList);
-        result.setTotal(memberPage.getTotal());
-        result.setCurrent(current);
-        result.setSize(pageSize);
-        return result;
+
+        //分页转换
+        return buildPage(memberPage, voList);
     }
 
 

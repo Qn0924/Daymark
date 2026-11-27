@@ -13,6 +13,7 @@ import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.vo.TeamInviteSentVO;
 import com.nan.daymarkbackend.model.vo.TeamInviteVO;
 import com.nan.daymarkbackend.model.vo.TeamMemberApplyVO;
+import com.nan.daymarkbackend.model.vo.TeamMemberVO;
 import com.nan.daymarkbackend.service.TeamMemberService;
 import com.nan.daymarkbackend.service.TeamService;
 import com.nan.daymarkbackend.service.UserService;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * 团队接口
@@ -198,6 +200,19 @@ public class TeamController {
         ThrowUtils.throwIf(teamMemberRemoveRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(httpRequest);
         return ResultUtils.success(teamMemberService.removeMember(teamMemberRemoveRequest, loginUser));
+    }
+
+    /**
+     * 我的成员列表
+     *
+     * @param teamPageQueryRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/member/list")
+    public BaseResponse<Page<TeamMemberVO>> listTeamMembers(@RequestBody TeamPageQueryRequest teamPageQueryRequest, HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(teamMemberService.listTeamMembers(teamPageQueryRequest, loginUser));
     }
 
 }
