@@ -6,6 +6,12 @@ import java.io.Serializable;
 
 @Data
 public class TeamMemberVO implements Serializable {
+
+    /**
+     * id
+     */
+    private Long id;
+
     /**
      * 用户id
      */

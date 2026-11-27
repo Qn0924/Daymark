@@ -761,9 +761,19 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
         //操作人身份是否是管理员
         boolean isAdmin = userService.isAdmin(loginUser);
-        if(TeamMemberRoleEnum.OWNER.getValue().equals(loginUser.getUserRole())||isAdmin){
+
+        TeamMember myself = this.lambdaQuery()
+                .eq(TeamMember::getTeamId, teamId)
+                .eq(TeamMember::getUserId, loginUser.getId())
+                .eq(TeamMember::getStatus, "active")
+                .one();
+        String myRole=null;
+        if(myself!=null){
+            myRole=myself.getRole();
+        }
+        if(TeamMemberRoleEnum.OWNER.getValue().equals(myRole)||isAdmin){
             ThrowUtils.throwIf(TeamMemberRoleEnum.OWNER.getValue().equals(target.getRole()), ErrorCode.NO_AUTH_ERROR, "不能移除团队负责人，如负责人违规，直接解散队伍！");
-        }else if(TeamMemberRoleEnum.MENTOR.getValue().equals(loginUser.getUserRole())){
+        }else if(TeamMemberRoleEnum.MENTOR.getValue().equals(myRole)){
             ThrowUtils.throwIf(TeamMemberRoleEnum.OWNER.getValue().equals(target.getRole()), ErrorCode.NO_AUTH_ERROR, "不能移除团队负责人");
             ThrowUtils.throwIf(TeamMemberRoleEnum.MENTOR.getValue().equals(target.getRole()), ErrorCode.NO_AUTH_ERROR, "监督者不能移除其他监督者");
         }else {
@@ -866,6 +876,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
                 Long userId = member.getUserId();
 
                 TeamMemberVO vo = new TeamMemberVO();
+                vo.setId(member.getId());
                 vo.setUserId(userId);
                 vo.setRole(member.getRole());
 
