@@ -12,6 +12,7 @@ import com.nan.daymarkbackend.exception.ThrowUtils;
 import com.nan.daymarkbackend.model.dto.user.*;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.vo.LoginUserVO;
+import com.nan.daymarkbackend.model.vo.UserPublicVO;
 import com.nan.daymarkbackend.model.vo.UserVO;
 import com.nan.daymarkbackend.service.UserService;
 import org.springframework.beans.BeanUtils;
@@ -199,6 +200,19 @@ public class UserController {
         User loginUser = userService.getLoginUser(request);
         boolean result = userService.updateUserPassword(userPasswordUpdateRequest, loginUser);
         return ResultUtils.success(result);
+    }
+
+    /**
+     * 公开部分用户信息
+     * @param userPublicQueryRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/list/page/public")
+    public BaseResponse<Page<UserPublicVO>> listPublicUserByPage(@RequestBody UserPublicQueryRequest userPublicQueryRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(userPublicQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        userService.getLoginUser(request);
+        return ResultUtils.success(userService.listPublicUserByPage(userPublicQueryRequest));
     }
 
 }

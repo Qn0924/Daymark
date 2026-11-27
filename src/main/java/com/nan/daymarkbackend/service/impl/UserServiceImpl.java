@@ -4,19 +4,18 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nan.daymarkbackend.annotation.AuthCheck;
 import com.nan.daymarkbackend.constant.UserConstant;
 import com.nan.daymarkbackend.exception.BusinessException;
 import com.nan.daymarkbackend.exception.ErrorCode;
 import com.nan.daymarkbackend.exception.ThrowUtils;
-import com.nan.daymarkbackend.model.dto.user.UserEditRequest;
-import com.nan.daymarkbackend.model.dto.user.UserPasswordUpdateRequest;
-import com.nan.daymarkbackend.model.dto.user.UserQueryRequest;
-import com.nan.daymarkbackend.model.dto.user.UserUpdateRequest;
+import com.nan.daymarkbackend.model.dto.user.*;
 import com.nan.daymarkbackend.model.entity.User;
 import com.nan.daymarkbackend.model.enums.UserRoleEnum;
 import com.nan.daymarkbackend.model.vo.LoginUserVO;
+import com.nan.daymarkbackend.model.vo.UserPublicVO;
 import com.nan.daymarkbackend.model.vo.UserVO;
 import com.nan.daymarkbackend.service.UserService;
 import com.nan.daymarkbackend.mapper.UserMapper;
@@ -385,6 +384,38 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         boolean result = this.updateById(updateUser);
         ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"数据库操作失败");
         return true;
+    }
+
+    /**
+     * 公开部分用户信息
+     * @param userPublicQueryRequest
+     * @return
+     */
+    @Override
+    public Page<UserPublicVO> listPublicUserByPage(UserPublicQueryRequest userPublicQueryRequest) {
+        ThrowUtils.throwIf(userPublicQueryRequest == null, ErrorCode.PARAMS_ERROR);
+
+        // 限制 pageSize，防止一次拉全站用户
+        int pageSize = userPublicQueryRequest.getPageSize();
+        int current = userPublicQueryRequest.getCurrent();
+
+        Page<User> userPage = this.lambdaQuery()
+                .like(StrUtil.isNotBlank(userPublicQueryRequest.getKeyword()), User::getUserName, userPublicQueryRequest.getKeyword())
+                .orderByDesc(User::getId)
+                .page(new Page<>(current, pageSize));
+
+        Page<UserPublicVO> voPage = new Page<>(current, pageSize, userPage.getTotal());
+        voPage.setRecords(userPage.getRecords().stream()
+                .map(user -> {
+            UserPublicVO vo = new UserPublicVO();
+            vo.setId(user.getId());
+            vo.setUserName(user.getUserName());
+            vo.setUserAvatar(user.getUserAvatar());
+            return vo;
+        }).collect(Collectors.toList()));
+
+        return voPage;
+
     }
 
 }
