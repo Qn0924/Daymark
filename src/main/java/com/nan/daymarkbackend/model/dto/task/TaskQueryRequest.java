@@ -7,6 +7,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class TaskQueryRequest extends PageRequest {
+
     /**
      * 模糊搜索
      */

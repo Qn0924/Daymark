@@ -1,5 +1,6 @@
 package com.nan.daymarkbackend.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateTime;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
@@ -22,10 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
 * @author 21289
@@ -584,13 +583,43 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task>
     /**
      * 把已过结束日期的开放任务关闭
      */
-    private void closeExpiredTasks() {
-        this.lambdaUpdate()
+    @Transactional(rollbackFor = Exception.class)
+    public void closeExpiredTasks() {
+        //查把符合条件的过期任务查出来
+        List<Task> expiredTaskList = this.lambdaQuery()
                 .isNull(Task::getUserId)
                 .eq(Task::getTaskStatus, TaskStatusEnum.OPEN.getValue())
                 .lt(Task::getEndDate, DateUtil.beginOfDay(new Date()))
+                .list();
+
+        //如果查出来没有过期的任务，直接结束，啥也不用干
+        if (expiredTaskList.isEmpty()) {
+            return;
+        }
+
+        //把查出来的任务ID、团队ID收集起来
+        List<Long> taskIds = new ArrayList<>();
+        Set<Long> teamIds = new HashSet<>();
+        for (Task task : expiredTaskList) {
+            taskIds.add(task.getId());
+            if (task.getTeamId() != null) {
+                teamIds.add(task.getTeamId());
+            }
+        }
+
+        //根据收集到的 taskIds，批量把任务关了
+        this.lambdaUpdate()
+                .in(Task::getId, taskIds)
                 .set(Task::getTaskStatus, TaskStatusEnum.CLOSE.getValue())
                 .update();
+
+        //根据收集到的 teamIds，批量把团队也关了
+        if (!teamIds.isEmpty()) {
+            teamService.lambdaUpdate()
+                    .in(Team::getId, teamIds)
+                    .set(Team::getStatus, TeamStatusEnum.CLOSED.getValue())
+                    .update();
+        }
     }
 }
 

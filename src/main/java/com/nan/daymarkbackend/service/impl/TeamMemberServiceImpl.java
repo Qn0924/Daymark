@@ -65,6 +65,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         ThrowUtils.throwIf(teamJoinApplyRequest == null, ErrorCode.PARAMS_ERROR);
         //登录校验
         ThrowUtils.throwIf(loginUser == null , ErrorCode.NOT_LOGIN_ERROR);
+        ThrowUtils.throwIf(teamJoinApplyRequest.getRole()==null,ErrorCode.PARAMS_ERROR,"角色不能为空！");
 
         //查任务
         Task task = taskService.lambdaQuery()
@@ -93,7 +94,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
                 // 正在审批中，直接拦截
                 if (pendingStatus.equals(currentStatus)) {
                     if (TeamMemberRoleEnum.MENTOR.getValue().equals(existMemberRole)) {
-                        ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "您正在被邀请为监督者，请同意或拒绝");
+                        ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "您已被邀请或已申请，请审批或等待！");
                     }else{
                         ThrowUtils.throwIf(true, ErrorCode.PARAMS_ERROR, "已有待处理的申请或邀请");
                     }
@@ -104,7 +105,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
                     if (TeamMemberRoleEnum.MENTOR.getValue().equals(existMemberRole)) {
                         ThrowUtils.throwIf(true, ErrorCode.PARAMS_ERROR, "已是监督者，不可申请了！");
                     } else {
-                        ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "已加入该团队，不可重复申请！");
+                        ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "已是团队成员，不可重复申请！");
                     }
                 }
 
@@ -382,7 +383,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
             if (TeamMemberStatusEnum.PENDING.getValue().equals(member.getStatus())) {
                 if (TeamMemberRoleEnum.MENTOR.getValue().equals(memberRole)) {
-                    ThrowUtils.throwIf(true, ErrorCode.PARAMS_ERROR, "该用户已经申请监督者，请审批！");
+                    ThrowUtils.throwIf(true, ErrorCode.PARAMS_ERROR, "该用户已被邀请或正在申请，请查审批或等待！");
                 } else {
                     ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "该用户已有待处理的申请或邀请");
                 }
@@ -858,11 +859,21 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
                     .collect(Collectors.groupingBy(User::getId));
 
             //批量查任务，按 userId 分组
+            Map<Long, List<Studytime>> studyTimeMap;
             Map<Long, List<Task>> taskMap;
             //是普通成员，不查
             if (isWorker) {
+                studyTimeMap = Collections.emptyMap();
                 taskMap = Collections.emptyMap();
             } else {
+                studyTimeMap = studytimeService.lambdaQuery()
+                        .eq(Studytime::getTeamId, teamId)
+                        .in(Studytime::getUserId, userIds)
+                        .eq(Studytime::getStatus, "finished")
+                        .list()
+                        .stream()
+                        .collect(Collectors.groupingBy(Studytime::getUserId));
+
                 taskMap = taskService.lambdaQuery()
                         .eq(Task::getTeamId, teamId)
                         .in(Task::getUserId, userIds)
@@ -889,15 +900,19 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
                 // 不是普通成员进行任务统计
                 if (!isWorker) {
-                    List<Task> records = taskMap.getOrDefault(userId, Collections.emptyList());
+                    List<Studytime> records = studyTimeMap.getOrDefault(userId, Collections.emptyList());
                     int total = 0;
-                    for (Task record : records) {
+                    for (Studytime record : records) {
                         if (record.getDuration() != null) {
                             total += record.getDuration();
                         }
                     }
                     vo.setCheckinCount(records.size());
                     vo.setTotalMinutes(total);
+                    List<Task> taskRecords = taskMap.getOrDefault(userId, Collections.emptyList());
+                    // 直接取 size 就是有几行
+                    int taskCount = taskRecords.size();
+                    vo.setTaskCount(taskCount);
                 }
                 voList.add(vo);
             }

@@ -33,7 +33,7 @@ public class TeamMemberVO implements Serializable {
     private String role;
 
     /**
-     * 打卡次数
+     * 学习计时次数
      */
     private Integer checkinCount;
 
@@ -41,4 +41,9 @@ public class TeamMemberVO implements Serializable {
      * 持续时间
      */
     private Integer totalMinutes;
+
+    /**
+     * 打卡次数
+     */
+    private Integer taskCount;
 }
